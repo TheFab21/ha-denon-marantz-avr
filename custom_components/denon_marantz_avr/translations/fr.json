@@ -78,6 +78,9 @@
             },
             "speaker_preset": {
                 "name": "Préréglage d'enceintes"
+            },
+            "sound_category": {
+                "name": "Catégorie de son"
             }
         },
         "switch": {

@@ -78,6 +78,9 @@
             },
             "speaker_preset": {
                 "name": "Speaker preset"
+            },
+            "sound_category": {
+                "name": "Sound category"
             }
         },
         "switch": {

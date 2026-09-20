@@ -41,6 +41,9 @@
       },
       "speaker_preset": {
         "default": "mdi:speaker-multiple"
+      },
+      "sound_category": {
+        "default": "mdi:surround-sound"
       }
     },
     "number": {

@@ -15,7 +15,7 @@ from denonavr.const import (
 from denonavr.exceptions import DenonAvrError
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 
-from .const import ECO_MODE_OPTIONS, SPEAKER_PRESET_OPTIONS
+from .const import ECO_MODE_OPTIONS, SOUND_CATEGORY_OPTIONS, SPEAKER_PRESET_OPTIONS
 from .entity import DenonControlsEntity
 
 if TYPE_CHECKING:
@@ -153,6 +153,15 @@ async def async_setup_entry(
         if supported:
             entities.append(AvrSelect(coordinator, description))
 
+    # Sound-mode category (genre), from the web API, when the receiver
+    # reports one.
+    if (
+        coordinator.web_available
+        and coordinator.sound_modes is not None
+        and coordinator.sound_modes.genre is not None
+    ):
+        entities.append(SoundCategorySelect(coordinator))
+
     async_add_entities(entities)
 
 
@@ -242,3 +251,35 @@ class AvrSelect(DenonControlsEntity, SelectEntity):
         await self.coordinator.async_send(
             lambda: self.entity_description.set_fn(option)
         )
+
+
+class SoundCategorySelect(DenonControlsEntity, SelectEntity):
+    """
+    Select the sound-mode category (genre) via the web API.
+
+    The receiver groups its surround modes into categories; picking one
+    changes which modes the media player then offers.
+    """
+
+    _attr_translation_key = "sound_category"
+    _attr_options = SOUND_CATEGORY_OPTIONS
+
+    def __init__(self, coordinator: DenonControlsCoordinator) -> None:
+        """Initialize the sound category select."""
+        super().__init__(coordinator, "sound_category")
+
+    @property
+    def current_option(self) -> str | None:
+        """Return the current category name."""
+        settings = self.coordinator.sound_modes
+        if settings is None or settings.genre is None:
+            return None
+        index = settings.genre - 1
+        if 0 <= index < len(SOUND_CATEGORY_OPTIONS):
+            return SOUND_CATEGORY_OPTIONS[index]
+        return None
+
+    async def async_select_option(self, option: str) -> None:
+        """Change the sound category."""
+        index = SOUND_CATEGORY_OPTIONS.index(option) + 1
+        await self.coordinator.async_set_sound_category(index)

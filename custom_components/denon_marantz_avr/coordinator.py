@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 from denonavr.const import ALL_TELNET_EVENTS
 from denonavr.exceptions import DenonAvrError
 from homeassistant.core import callback
+from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -26,12 +27,15 @@ from .const import (
     DEFAULT_POWER_ON_DELAY,
     DOMAIN,
 )
+from .webapi import async_get_sound_mode_settings, async_select_genre
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     from denonavr import DenonAVR
     from homeassistant.core import HomeAssistant
+
+    from .webapi import SoundModeSettings
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -55,6 +59,29 @@ class DenonControlsCoordinator(DataUpdateCoordinator[None]):
         self.receiver = receiver
         self.device_id = device_id
         self.command_lock = asyncio.Lock()
+        # Real sound-mode list / current category from the port-11080 web API.
+        self.sound_modes: SoundModeSettings | None = None
+        self.web_available = False
+        self._web_probed = False
+
+    async def _async_update_web(self) -> None:
+        """Refresh the web-API sound-mode settings (best-effort)."""
+        if self._web_probed and not self.web_available:
+            return
+        settings = await async_get_sound_mode_settings(
+            get_async_client(self.hass), self.receiver.host
+        )
+        if settings is not None:
+            self.web_available = True
+            self.sound_modes = settings
+        elif not self._web_probed:
+            self.web_available = False
+        self._web_probed = True
+
+    async def async_set_sound_category(self, index: int) -> None:
+        """Select a sound-mode category (genre) and refresh."""
+        await async_select_genre(get_async_client(self.hass), self.receiver.host, index)
+        await self.async_request_refresh()
 
     @callback
     def async_register_telnet_listener(self) -> Callable[[], None]:
@@ -100,6 +127,7 @@ class DenonControlsCoordinator(DataUpdateCoordinator[None]):
                     await self.receiver.async_update_audyssey()
         except DenonAvrError as err:
             raise UpdateFailed from err
+        await self._async_update_web()
 
     async def async_run_command(self, command: Callable[[], Awaitable[None]]) -> None:
         """Run one command at a time and refresh Audyssey afterward."""

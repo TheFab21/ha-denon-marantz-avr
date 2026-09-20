@@ -68,6 +68,10 @@ ECO_MODE_OPTIONS = ["Off", "Auto", "On"]
 # Speaker preset slots (the receiver exposes presets 1 and 2)
 SPEAKER_PRESET_OPTIONS = ["1", "2"]
 
+# Sound-mode categories ("genre") on the web API. The receiver reports the
+# current category as a 1-based number; these are its labels in that order.
+SOUND_CATEGORY_OPTIONS = ["Movie", "Music", "Game", "Pure"]
+
 # Audio delay (ms) and sleep timer (minutes) ranges, per the denonavr protocol
 MIN_DELAY_TIME_MS = 0
 MAX_DELAY_TIME_MS = 999

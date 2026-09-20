@@ -132,18 +132,31 @@ async def async_get_sound_mode_settings(
     return _parse_sound_modes(response.text)
 
 
-async def async_select_sound_mode(
-    client: httpx.AsyncClient, host: str, index: int
+async def _async_set(
+    client: httpx.AsyncClient, host: str, data: str, what: str
 ) -> bool:
-    """Select a sound mode by its receiver index. Return True on success."""
     try:
         response = await client.get(
             f"{_base_url(host)}/set_config",
-            params={"type": _SET_TYPE, "data": f"<SoundMode>{index}</SoundMode>"},
+            params={"type": _SET_TYPE, "data": data},
             timeout=_TIMEOUT,
         )
         response.raise_for_status()
     except (httpx.HTTPError, OSError) as err:
-        _LOGGER.debug("Web API sound-mode set failed for %s: %s", host, err)
+        _LOGGER.debug("Web API %s set failed for %s: %s", what, host, err)
         return False
     return True
+
+
+async def async_select_sound_mode(
+    client: httpx.AsyncClient, host: str, index: int
+) -> bool:
+    """Select a sound mode by its receiver index. Return True on success."""
+    return await _async_set(
+        client, host, f"<SoundMode>{index}</SoundMode>", "sound-mode"
+    )
+
+
+async def async_select_genre(client: httpx.AsyncClient, host: str, index: int) -> bool:
+    """Select a sound category (genre) by its 1-based index."""
+    return await _async_set(client, host, f"<Genre>{index}</Genre>", "genre")
