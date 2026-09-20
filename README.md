@@ -1,5 +1,6 @@
 # Denon & Marantz AVR for Home Assistant
 
+[![GitHub Release](https://img.shields.io/github/v/release/TheFab21/ha-denon-marantz-avr?style=flat)](https://github.com/TheFab21/ha-denon-marantz-avr/releases/latest)
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 
 A **complete** custom Home Assistant integration for Denon and Marantz A/V
