@@ -24,7 +24,7 @@ jobs:
       contents: write
     steps:
       - name: "Checkout the repository"
-        uses: "actions/checkout@v6.0.2"
+        uses: "actions/checkout@v7.0.1"
 
       - name: "ZIP the integration directory"
         shell: "bash"
@@ -33,7 +33,7 @@ jobs:
           zip denon_marantz_avr.zip -r ./
 
       - name: "Create the release and upload the ZIP file"
-        uses: "softprops/action-gh-release@v3.0.0"
+        uses: "softprops/action-gh-release@v3.0.3"
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           generate_release_notes: true
