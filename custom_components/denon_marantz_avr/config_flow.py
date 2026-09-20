@@ -1,4 +1,4 @@
-"""Config flow to configure Marantz+ compatible receivers using their HTTP interface."""
+"""Config flow for Denon & Marantz AVR receivers."""
 
 from __future__ import annotations
 
@@ -101,7 +101,7 @@ class OptionsFlowHandler(OptionsFlowWithReload):
 
 
 class DenonAvrFlowHandler(ConfigFlow, domain=DOMAIN):
-    """Handle a Marantz+ config flow."""
+    """Handle a Denon/Marantz AVR config flow."""
 
     VERSION = 1
 
@@ -246,7 +246,7 @@ class DenonAvrFlowHandler(ConfigFlow, domain=DOMAIN):
         self, discovery_info: SsdpServiceInfo
     ) -> ConfigFlowResult:
         """
-        Handle a discovered Marantz+ compatible receiver.
+        Handle a discovered Denon/Marantz AVR compatible receiver.
 
         This flow is triggered by the SSDP component. It will check if the
         host is already configured and delegate to the import step if not.
@@ -256,23 +256,23 @@ class DenonAvrFlowHandler(ConfigFlow, domain=DOMAIN):
             discovery_info.upnp.get(ATTR_UPNP_MANUFACTURER)
             not in SUPPORTED_MANUFACTURERS
         ):
-            return self.async_abort(reason="not_denonavr_manufacturer")
+            return self.async_abort(reason="not_compatible_manufacturer")
 
         # Check if required information is present to set the unique_id
         if (
             ATTR_UPNP_MODEL_NAME not in discovery_info.upnp
             or ATTR_UPNP_SERIAL not in discovery_info.upnp
         ):
-            return self.async_abort(reason="not_denonavr_missing")
+            return self.async_abort(reason="not_compatible_missing")
 
         self.model_name = discovery_info.upnp[ATTR_UPNP_MODEL_NAME].replace("*", "")
         self.serial_number = discovery_info.upnp[ATTR_UPNP_SERIAL]
         if not discovery_info.ssdp_location:
-            return self.async_abort(reason="not_denonavr_missing")
+            return self.async_abort(reason="not_compatible_missing")
         self.host = urlparse(discovery_info.ssdp_location).hostname
 
         if self.model_name in IGNORED_MODELS:
-            return self.async_abort(reason="not_denonavr_manufacturer")
+            return self.async_abort(reason="not_compatible_manufacturer")
 
         unique_id = self.construct_unique_id(self.model_name, self.serial_number)
         await self.async_set_unique_id(unique_id)

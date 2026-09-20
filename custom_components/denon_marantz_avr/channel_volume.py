@@ -1,5 +1,5 @@
 """
-Channel volume management for Marantz+ integration.
+Channel volume management for Denon/Marantz AVR integration.
 
 This module provides the ChannelVolumeManager class for managing individual
 speaker channel volume controls through Home Assistant number entities.

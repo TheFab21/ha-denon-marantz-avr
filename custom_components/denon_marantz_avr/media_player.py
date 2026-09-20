@@ -115,9 +115,9 @@ async def async_setup_entry(
     config_entry: DenonavrConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up the Marantz+ receiver from a config entry."""
+    """Set up the Denon/Marantz AVR receiver from a config entry."""
     entities = []
-    receiver = config_entry.runtime_data
+    receiver = config_entry.runtime_data.receiver
     update_audyssey = config_entry.options.get(
         CONF_UPDATE_AUDYSSEY, DEFAULT_UPDATE_AUDYSSEY
     )

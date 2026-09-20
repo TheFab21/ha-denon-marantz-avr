@@ -4,11 +4,11 @@
       "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
       "already_in_progress": "[%key:common::config_flow::abort::already_in_progress%]",
       "cannot_connect": "Failed to connect, please try again, disconnecting mains power and Ethernet cables and reconnecting them may help",
-      "not_marantzplus_manufacturer": "Not a Marantz+ compatible receiver, discovered manufacturer did not match",
-      "not_marantzplus_missing": "Not a Marantz+ compatible receiver, discovery information not complete"
+      "not_compatible_manufacturer": "Not a compatible Denon/Marantz receiver, discovered manufacturer did not match",
+      "not_compatible_missing": "Not a compatible Denon/Marantz receiver, discovery information not complete"
     },
     "error": {
-      "discovery_error": "Failed to discover a Marantz+ compatible receiver"
+      "discovery_error": "Failed to discover a compatible Denon/Marantz receiver"
     },
     "flow_title": "{name}",
     "step": {
@@ -44,6 +44,35 @@
           "zone3": "Set up Zone 3"
         },
         "description": "Specify optional settings"
+      }
+    }
+  },
+  "entity": {
+    "select": {
+      "dynamic_volume": {
+        "name": "Dynamic volume"
+      },
+      "reference_level_offset": {
+        "name": "Reference level offset"
+      },
+      "multi_eq": {
+        "name": "MultiEQ"
+      },
+      "eco_mode": {
+        "name": "Eco mode"
+      }
+    },
+    "switch": {
+      "dynamic_eq": {
+        "name": "Dynamic EQ"
+      }
+    },
+    "button": {
+      "refresh_audyssey": {
+        "name": "Refresh Audyssey"
+      },
+      "recover_audio": {
+        "name": "Recover audio"
       }
     }
   },

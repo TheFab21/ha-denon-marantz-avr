@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.marantzplus.channel_volume import (
+from custom_components.denon_marantz_avr.channel_volume import (
     ChannelVolumeNumber,
     db_to_protocol,
     protocol_to_db,

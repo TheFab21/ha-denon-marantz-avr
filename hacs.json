@@ -1,6 +1,6 @@
 {
-    "name": "Marantz+",
-    "filename": "marantzplus.zip",
+    "name": "Denon & Marantz AVR",
+    "filename": "denon_marantz_avr.zip",
     "homeassistant": "2026.2.0",
     "hacs": "2.0.5",
     "hide_default_branch": true,

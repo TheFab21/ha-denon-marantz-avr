@@ -1,0 +1,42 @@
+{
+  "entity": {
+    "switch": {
+      "dynamic_eq": {
+        "default": "mdi:tune"
+      }
+    },
+    "select": {
+      "dynamic_volume": {
+        "default": "mdi:volume-vibrate"
+      },
+      "reference_level_offset": {
+        "default": "mdi:altimeter"
+      },
+      "multi_eq": {
+        "default": "mdi:equalizer"
+      },
+      "eco_mode": {
+        "default": "mdi:leaf"
+      }
+    },
+    "button": {
+      "refresh_audyssey": {
+        "default": "mdi:refresh"
+      },
+      "recover_audio": {
+        "default": "mdi:restart"
+      }
+    }
+  },
+  "services": {
+    "get_command": {
+      "service": "mdi:console"
+    },
+    "set_dynamic_eq": {
+      "service": "mdi:tune"
+    },
+    "update_audyssey": {
+      "service": "mdi:waveform"
+    }
+  }
+}

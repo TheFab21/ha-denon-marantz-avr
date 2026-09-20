@@ -1,12 +1,26 @@
-"""The marantzplus component."""
+"""
+The Denon & Marantz AVR component.
+
+This integration merges three community projects into a single, complete
+custom component for Denon and Marantz network receivers:
+
+* a full media player (HTTP + real-time Telnet push, multi-zone),
+* per-channel volume ``number`` entities, and
+* the extra Audyssey / Eco ``switch`` / ``select`` / ``button`` controls that
+  the core integration does not expose.
+
+Everything is driven from one config entry and one connection to the receiver.
+"""
+
+from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from denonavr import DenonAVR
 from denonavr.exceptions import AvrNetworkError, AvrTimoutError
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST, EVENT_HOMEASSISTANT_STOP, Platform
-from homeassistant.core import Event, HomeAssistant
+from homeassistant.const import CONF_HOST, EVENT_HOMEASSISTANT_STOP
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.httpx_client import get_async_client
@@ -23,18 +37,31 @@ from .const import (
     DEFAULT_USE_TELNET,
     DEFAULT_ZONE2,
     DEFAULT_ZONE3,
+    PLATFORMS,
 )
+from .coordinator import DenonControlsCoordinator
 from .receiver import ConnectDenonAVR
 
-PLATFORMS = [Platform.MEDIA_PLAYER, Platform.NUMBER]
+if TYPE_CHECKING:
+    from denonavr import DenonAVR
+    from homeassistant.core import Event, HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 
-type DenonavrConfigEntry = ConfigEntry[DenonAVR]
+
+@dataclass
+class DenonMarantzData:
+    """Runtime data shared by every platform of this integration."""
+
+    receiver: DenonAVR
+    controls: DenonControlsCoordinator
+
+
+type DenonavrConfigEntry = ConfigEntry[DenonMarantzData]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: DenonavrConfigEntry) -> bool:
-    """Set up the marantzplus components from a config entry."""
+    """Set up the Denon & Marantz AVR components from a config entry."""
     # Connect to receiver
     connect_denonavr = ConnectDenonAVR(
         entry.data[CONF_HOST],
@@ -51,8 +78,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: DenonavrConfigEntry) -> 
     except (AvrNetworkError, AvrTimoutError) as ex:
         raise ConfigEntryNotReady from ex
     receiver = connect_denonavr.receiver
+    if receiver is None:
+        raise ConfigEntryNotReady
 
-    entry.runtime_data = receiver
+    # Coordinator for the extra Audyssey / Eco controls. It reuses the same
+    # receiver instance, so no second connection is opened.
+    device_id = entry.unique_id or entry.entry_id
+    controls = DenonControlsCoordinator(hass, receiver, device_id)
+    await controls.async_config_entry_first_refresh()
+
+    entry.runtime_data = DenonMarantzData(receiver=receiver, controls=controls)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     use_telnet = entry.options.get(CONF_USE_TELNET, DEFAULT_USE_TELNET)
@@ -79,7 +114,7 @@ async def async_unload_entry(
     )
 
     if config_entry.options.get(CONF_USE_TELNET, DEFAULT_USE_TELNET):
-        receiver = config_entry.runtime_data
+        receiver = config_entry.runtime_data.receiver
         await receiver.async_telnet_disconnect()
 
     # Remove zone2 and zone3 entities if needed
@@ -91,9 +126,9 @@ async def async_unload_entry(
     for entry in entries:
         if entry.unique_id == zone2_id and not config_entry.options.get(CONF_ZONE2):
             entity_registry.async_remove(entry.entity_id)
-            _LOGGER.debug("Removing zone2 from DenonAvr")
+            _LOGGER.debug("Removing zone2 from Denon/Marantz AVR")
         if entry.unique_id == zone3_id and not config_entry.options.get(CONF_ZONE3):
             entity_registry.async_remove(entry.entity_id)
-            _LOGGER.debug("Removing zone3 from DenonAvr")
+            _LOGGER.debug("Removing zone3 from Denon/Marantz AVR")
 
     return unload_ok

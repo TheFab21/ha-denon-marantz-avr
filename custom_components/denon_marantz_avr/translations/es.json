@@ -4,11 +4,11 @@
             "already_configured": "El dispositivo ya está configurado",
             "already_in_progress": "El flujo de configuración ya está en curso",
             "cannot_connect": "Error al conectar, inténtelo de nuevo. Desconectar y volver a conectar los cables de alimentación y Ethernet puede ayudar",
-            "not_marantzplus_manufacturer": "Receptor no compatible con Marantz+, el fabricante descubierto no coincide",
-            "not_marantzplus_missing": "Receptor no compatible con Marantz+, información de descubrimiento incompleta"
+            "not_compatible_manufacturer": "Receptor no compatible con Denon/Marantz AVR, el fabricante descubierto no coincide",
+            "not_compatible_missing": "Receptor no compatible con Denon/Marantz AVR, información de descubrimiento incompleta"
         },
         "error": {
-            "discovery_error": "Error al descubrir un receptor compatible con Marantz+"
+            "discovery_error": "Error al descubrir un receptor compatible con Denon/Marantz AVR"
         },
         "flow_title": "{name}",
         "step": {
@@ -44,6 +44,35 @@
                     "zone3": "Configurar Zona 3"
                 },
                 "description": "Especificar configuraciones opcionales"
+            }
+        }
+    },
+    "entity": {
+        "select": {
+            "dynamic_volume": {
+                "name": "Volumen dinámico"
+            },
+            "reference_level_offset": {
+                "name": "Desplazamiento del nivel de referencia"
+            },
+            "multi_eq": {
+                "name": "MultiEQ"
+            },
+            "eco_mode": {
+                "name": "Modo Eco"
+            }
+        },
+        "switch": {
+            "dynamic_eq": {
+                "name": "EQ dinámico"
+            }
+        },
+        "button": {
+            "refresh_audyssey": {
+                "name": "Actualizar Audyssey"
+            },
+            "recover_audio": {
+                "name": "Recuperar audio"
             }
         }
     },

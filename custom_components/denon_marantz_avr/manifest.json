@@ -1,19 +1,20 @@
 {
-  "domain": "marantzplus",
-  "name": "Marantz+",
+  "domain": "denon_marantz_avr",
+  "name": "Denon & Marantz AVR",
   "codeowners": [
-    "@foxey"
+    "@thefab21"
   ],
   "config_flow": true,
-  "documentation": "https://github.com/foxey/ha-marantz-plus",
+  "documentation": "https://github.com/thefab21/ha-denon-marantz-avr",
   "integration_type": "device",
   "iot_class": "local_push",
-  "issue_tracker": "https://github.com/foxey/ha-marantz-plus/issues",
+  "issue_tracker": "https://github.com/thefab21/ha-denon-marantz-avr/issues",
   "loggers": [
-    "marantzplus"
+    "denonavr",
+    "denon_marantz_avr"
   ],
   "requirements": [
-    "denonavr==1.2.0"
+    "denonavr==1.3.3"
   ],
   "ssdp": [
     {
@@ -65,5 +66,5 @@
       "manufacturer": "Marantz"
     }
   ],
-  "version": "0.2.1"
+  "version": "1.0.0"
 }

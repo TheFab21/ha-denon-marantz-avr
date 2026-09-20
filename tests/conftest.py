@@ -1,4 +1,4 @@
-"""Shared fixtures for ha-marantz-plus tests."""
+"""Shared fixtures for ha-denon-marantz-avr tests."""
 
 import sys
 import types
@@ -40,6 +40,22 @@ sys.modules.setdefault(
 sys.modules["homeassistant.components.number"] = _ha_number_mod
 sys.modules.setdefault("homeassistant.core", types.ModuleType("homeassistant.core"))
 
+
+# homeassistant.const (Platform enum used by const.py)
+class _Platform:
+    """Minimal stand-in for homeassistant.const.Platform."""
+
+    MEDIA_PLAYER = "media_player"
+    NUMBER = "number"
+    BUTTON = "button"
+    SELECT = "select"
+    SWITCH = "switch"
+
+
+_ha_const_mod = types.ModuleType("homeassistant.const")
+_ha_const_mod.Platform = _Platform
+sys.modules["homeassistant.const"] = _ha_const_mod
+
 # denonavr
 _denonavr_const = types.ModuleType("denonavr.const")
 _denonavr_const.POWER_ON = "ON"
@@ -48,7 +64,7 @@ sys.modules.setdefault("denonavr", types.ModuleType("denonavr"))
 sys.modules["denonavr.const"] = _denonavr_const
 
 # ---------------------------------------------------------------------------
-# Stub the custom_components.marantzplus *package* to bypass __init__.py,
+# Stub the custom_components.denon_marantz_avr *package* to bypass __init__.py,
 # which uses Python 3.12 `type` statement syntax incompatible with 3.11.
 # Python will still find and load individual submodules (const, channel_volume)
 # from the real source directory via __path__.
@@ -56,24 +72,24 @@ sys.modules["denonavr.const"] = _denonavr_const
 import pathlib as _pathlib
 
 _repo_root = _pathlib.Path(__file__).parent.parent
-_pkg_path = [str(_repo_root / "custom_components" / "marantzplus")]
+_pkg_path = [str(_repo_root / "custom_components" / "denon_marantz_avr")]
 
 _cc_mod = types.ModuleType("custom_components")
 _cc_mod.__path__ = [str(_repo_root / "custom_components")]  # type: ignore[attr-defined]
 sys.modules.setdefault("custom_components", _cc_mod)
 
-_pkg_mod = types.ModuleType("custom_components.marantzplus")
+_pkg_mod = types.ModuleType("custom_components.denon_marantz_avr")
 _pkg_mod.__path__ = _pkg_path  # type: ignore[attr-defined]
-_pkg_mod.__package__ = "custom_components.marantzplus"
-sys.modules["custom_components.marantzplus"] = _pkg_mod
+_pkg_mod.__package__ = "custom_components.denon_marantz_avr"
+sys.modules["custom_components.denon_marantz_avr"] = _pkg_mod
 
 # ---------------------------------------------------------------------------
 
-from custom_components.marantzplus.channel_volume import (
+from custom_components.denon_marantz_avr.channel_volume import (
     ChannelVolumeManager,
     ChannelVolumeNumber,
 )
-from custom_components.marantzplus.const import CHANNEL_MAP
+from custom_components.denon_marantz_avr.const import CHANNEL_MAP
 from denonavr.const import POWER_ON
 
 

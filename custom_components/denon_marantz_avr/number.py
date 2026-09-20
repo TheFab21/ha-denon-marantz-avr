@@ -25,7 +25,7 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up channel volume number entities from a config entry."""
-    receiver = config_entry.runtime_data
+    receiver = config_entry.runtime_data.receiver
     entities = []
     managers = []
 

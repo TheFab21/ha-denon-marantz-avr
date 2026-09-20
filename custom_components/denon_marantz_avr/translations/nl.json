@@ -4,11 +4,11 @@
             "already_configured": "Apparaat is al geconfigureerd",
             "already_in_progress": "Configuratiestroom is al bezig",
             "cannot_connect": "Kan geen verbinding maken, probeer het opnieuw. Het loskoppelen en opnieuw aansluiten van de stroom- en ethernetkabels kan helpen",
-            "not_marantzplus_manufacturer": "Geen Marantz+ compatibele receiver, ontdekte fabrikant komt niet overeen",
-            "not_marantzplus_missing": "Geen Marantz+ compatibele receiver, ontdekkingsinformatie niet compleet"
+            "not_compatible_manufacturer": "Geen Denon/Marantz AVR compatibele receiver, ontdekte fabrikant komt niet overeen",
+            "not_compatible_missing": "Geen Denon/Marantz AVR compatibele receiver, ontdekkingsinformatie niet compleet"
         },
         "error": {
-            "discovery_error": "Kan geen Marantz+ compatibele receiver ontdekken"
+            "discovery_error": "Kan geen Denon/Marantz AVR compatibele receiver ontdekken"
         },
         "flow_title": "{name}",
         "step": {
@@ -44,6 +44,35 @@
                     "zone3": "Zone 3 instellen"
                 },
                 "description": "Geef optionele instellingen op"
+            }
+        }
+    },
+    "entity": {
+        "select": {
+            "dynamic_volume": {
+                "name": "Dynamisch volume"
+            },
+            "reference_level_offset": {
+                "name": "Referentieniveau-offset"
+            },
+            "multi_eq": {
+                "name": "MultiEQ"
+            },
+            "eco_mode": {
+                "name": "Eco-modus"
+            }
+        },
+        "switch": {
+            "dynamic_eq": {
+                "name": "Dynamische EQ"
+            }
+        },
+        "button": {
+            "refresh_audyssey": {
+                "name": "Audyssey vernieuwen"
+            },
+            "recover_audio": {
+                "name": "Audio herstellen"
             }
         }
     },

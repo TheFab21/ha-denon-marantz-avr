@@ -1,6 +1,18 @@
-"""Constants for Marantz+."""
+"""Constants for Denon/Marantz AVR."""
 
-DOMAIN = "marantzplus"
+from datetime import timedelta
+
+from homeassistant.const import Platform
+
+DOMAIN = "denon_marantz_avr"
+
+PLATFORMS = [
+    Platform.MEDIA_PLAYER,
+    Platform.NUMBER,
+    Platform.BUTTON,
+    Platform.SELECT,
+    Platform.SWITCH,
+]
 
 
 CONF_SHOW_ALL_SOURCES = "show_all_sources"
@@ -46,3 +58,9 @@ ZONE_PREFIXES = {
     "Zone2": "Z2",
     "Zone3": "Z3",
 }
+
+# Audyssey / Eco controls (from the denonavr-controls layer, now native)
+CONTROLS_SCAN_INTERVAL = timedelta(seconds=30)
+DEFAULT_POWER_OFF_DELAY = 5
+DEFAULT_POWER_ON_DELAY = 12
+ECO_MODE_OPTIONS = ["Off", "Auto", "On"]

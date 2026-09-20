@@ -9,4 +9,4 @@ homeassistant:
 logger:
   default: info
   logs:
-    custom_components.marantzplus: debug
+    custom_components.denon_marantz_avr: debug

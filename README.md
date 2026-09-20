@@ -1,177 +1,163 @@
-# Marantz+ for Home Assistant
+# Denon & Marantz AVR for Home Assistant
 
-A custom Home Assistant integration for controlling Denon and Marantz AVR (Audio/Video Receiver) network receivers. This integration extends the core `denonavr` integration with additional features and improvements.
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
-[![GitHub Release](https://img.shields.io/github/release/foxey/ha-marantz-plus.svg)](https://github.com/foxey/ha-marantz-plus/releases)
+A **complete** custom Home Assistant integration for Denon and Marantz A/V
+network receivers. It merges three community projects into a single component
+with **one config entry, one connection to the receiver, and one device** in
+Home Assistant:
+
+- A full **media player** (HTTP control + real-time Telnet push, multi-zone).
+- Per-channel **volume** controls (`number` entities, in dB).
+- The extra **Audyssey / Eco controls** that the core integration does not
+  expose — Dynamic EQ, Dynamic Volume, Reference Level Offset, MultiEQ, Eco
+  mode, plus *Refresh Audyssey* and *Recover audio* buttons.
+
+> **Domain:** `denon_marantz_avr` — deliberately distinct from the built-in
+> `denonavr` integration. Using a brand-new domain means this component never
+> shadows or conflicts with a core Home Assistant integration and keeps working
+> across Home Assistant upgrades. You can even run it side by side with the
+> official integration while you migrate.
 
 ## Features
 
-- **Local Network Control**: Direct communication with your AVR over your local network
-- **Multi-Zone Support**: Control Main Zone, Zone 2, and Zone 3
-- **Automatic Discovery**: SSDP-based auto-discovery of compatible receivers
-- **Real-Time Updates**: Optional Telnet connection for instant status updates
-- **Audyssey Settings**: Configure and update Audyssey audio calibration
-- **Full Media Player Integration**: Complete playback control, source selection, volume, and sound modes
-- **Config Flow UI**: Easy setup and configuration through the Home Assistant UI
+| Area | What you get |
+|------|--------------|
+| **Media player** | Power, volume (set/step/mute), source selection, sound-mode selection, transport controls and now-playing metadata for network sources |
+| **Multi-zone** | Main Zone plus optional Zone 2 and Zone 3 as separate entities |
+| **Real-time updates** | Telnet push connection (`local_push`) for instant state changes, with HTTP fallback |
+| **Discovery** | SSDP auto-discovery of Denon, Denon Professional and Marantz receivers |
+| **Channel volume** | Per-channel trim (Front L/R, Center, Surround L/R, Subwoofer) as `number` entities in dB |
+| **Audyssey** | Dynamic EQ (`switch`), Dynamic Volume / Reference Level Offset / MultiEQ (`select`) |
+| **Eco mode** | Off / Auto / On (`select`) |
+| **Buttons** | Refresh Audyssey, Recover audio (soft power-cycle that restores the previous input) |
+| **Services** | `get_command`, `set_dynamic_eq`, `update_audyssey` |
 
-## Supported Devices
+## Supported devices
 
 - Denon AVR network receivers
-- Denon Professional AVR receivers  
+- Denon Professional AVR receivers
 - Marantz AVR network receivers
 
 ## Installation
 
-### HACS (Recommended)
+### HACS (recommended)
 
-1. Open HACS in your Home Assistant instance
-2. Click on "Integrations"
-3. Click the three dots in the top right corner
-4. Select "Custom repositories"
-5. Add this repository URL: `https://github.com/foxey/ha-marantz-plus`
-6. Select category "Integration"
-7. Click "Add"
-8. Find "Marantz+" in the integration list and click "Download"
-9. Restart Home Assistant
+1. In HACS, open the three-dot menu → **Custom repositories**.
+2. Add `https://github.com/thefab21/ha-denon-marantz-avr` with category **Integration**.
+3. Install **Denon & Marantz AVR** and restart Home Assistant.
 
-### Manual Installation
+### Manual
 
-1. Download the latest release from the [releases page](https://github.com/foxey/ha-marantz-plus/releases)
-2. Extract the `marantzplus` folder from the zip file
-3. Copy the `marantzplus` folder to your `custom_components` directory
-4. Restart Home Assistant
+1. Copy `custom_components/denon_marantz_avr` into your Home Assistant
+   `config/custom_components` directory.
+2. Restart Home Assistant.
 
 ## Configuration
 
-### Adding the Integration
+1. Go to **Settings → Devices & Services → Add Integration**.
+2. Search for **Denon & Marantz AVR**.
+3. Leave the address blank to auto-discover, or enter the receiver's IP address.
 
-1. Go to **Settings** → **Devices & Services**
-2. Click **Add Integration**
-3. Search for **Marantz+**
-4. Follow the setup wizard:
-   - Leave the IP address blank for auto-discovery, or
-   - Enter your receiver's IP address for manual setup
+Discovered receivers are also offered automatically as a notification.
 
 ### Options
 
-After adding the integration, you can configure additional options:
+After setup, open the integration options to configure:
 
-- **Show all sources**: Display all available input sources
-- **Zone 2**: Enable Zone 2 control
-- **Zone 3**: Enable Zone 3 control
-- **Use Telnet connection**: Enable real-time updates via Telnet (recommended)
-- **Update Audyssey settings**: Enable Audyssey configuration
+- **Show all sources** — list every input source, including hidden ones.
+- **Set up Zone 2 / Zone 3** — add extra zone media players.
+- **Use Telnet connection** — real-time push updates (enabled by default for new
+  installs). Only one Telnet client can be connected to the receiver at a time.
+- **Update Audyssey settings** — also poll Audyssey values with the media player.
+
+## Entities
+
+All entities are grouped under a single Home Assistant device per receiver:
+
+- `media_player.*` — one per active zone
+- `number.*` — per-channel volume trim
+- `switch.*_dynamic_eq`
+- `select.*_dynamic_volume`, `*_reference_level_offset`, `*_multi_eq`, `*_eco_mode`
+- `button.*_refresh_audyssey`, `*_recover_audio`
 
 ## Services
 
-The integration provides the following services:
+### `denon_marantz_avr.get_command`
 
-### `marantzplus.get_command`
-
-Send a generic HTTP GET command to the receiver.
+Send a raw HTTP GET command to the receiver.
 
 ```yaml
-service: marantzplus.get_command
+action: denon_marantz_avr.get_command
 target:
-  entity_id: media_player.marantz_avr
+  entity_id: media_player.denon_avr
 data:
   command: "/goform/formiPhoneAppDirect.xml?SYSTANDBY"
 ```
 
-### `marantzplus.set_dynamic_eq`
-
-Enable or disable DynamicEQ.
+### `denon_marantz_avr.set_dynamic_eq`
 
 ```yaml
-service: marantzplus.set_dynamic_eq
+action: denon_marantz_avr.set_dynamic_eq
 target:
-  entity_id: media_player.marantz_avr
+  entity_id: media_player.denon_avr
 data:
   dynamic_eq: true
 ```
 
-### `marantzplus.update_audyssey`
-
-Update Audyssey settings from the receiver.
+### `denon_marantz_avr.update_audyssey`
 
 ```yaml
-service: marantzplus.update_audyssey
+action: denon_marantz_avr.update_audyssey
 target:
-  entity_id: media_player.marantz_avr
+  entity_id: media_player.denon_avr
 ```
+
+## How it works
+
+The integration wraps the [`denonavr`](https://github.com/ol-iver/denonavr)
+Python library. A single `DenonAVR` instance is created per config entry and
+shared by every platform:
+
+- The **media player** and **channel-volume** entities use the receiver
+  directly and receive push updates over Telnet.
+- A lightweight **coordinator** polls the Audyssey/Eco state (which is not sent
+  over Telnet) and serializes control commands, backing the `switch`, `select`
+  and `button` entities.
+
+The *Recover audio* button performs a **soft** power cycle (standby off/on) and
+restores the previously selected input. It never cuts electrical power; do not
+use it while the receiver is updating its firmware.
 
 ## Development
 
-### Prerequisites
-
-- Python 3.x
-- Home Assistant >= 2026.2.0
-- Git
-
-### Setup Development Environment
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/foxey/ha-marantz-plus.git
-   cd ha-marantz-plus
-   ```
-
-2. Run the setup script:
-   ```bash
-   scripts/setup
-   ```
-
-3. Start the development server:
-   ```bash
-   scripts/develop
-   ```
-
-   This will start a local Home Assistant instance at `http://localhost:8123` with the integration loaded.
-
-### Linting
-
-Run the linter to check code quality:
-
 ```bash
-scripts/lint
+scripts/setup      # install dependencies
+scripts/develop    # run a local Home Assistant with the integration loaded
+scripts/lint       # ruff format + check
+python -m pytest   # run the unit tests
 ```
 
-## Technical Details
+## Credits
 
-- **Integration Type**: Device integration with local push
-- **Communication**: HTTP API with optional Telnet for real-time updates
-- **Discovery**: SSDP for automatic device detection
-- **Library**: Uses the [denonavr](https://github.com/ol-iver/denonavr) Python library (v1.2.0)
+This project unifies and builds on the work of several community projects:
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+- [`foxey/ha-marantz-plus`](https://github.com/foxey/ha-marantz-plus) — media
+  player, config flow, channel volume and services base.
+- [`cvanvliet/ha-denonavr-controls`](https://github.com/cvanvliet/ha-denonavr-controls) —
+  the native Audyssey / Eco `switch` / `select` / `button` controls.
+- [`frawau/ha-aiomadeavr`](https://github.com/frawau/ha-aiomadeavr) — the
+  real-time Telnet-push approach.
+- The [`denonavr`](https://github.com/ol-iver/denonavr) library by
+  [@ol-iver](https://github.com/ol-iver).
+- Based on the core Home Assistant
+  [denonavr](https://www.home-assistant.io/integrations/denonavr) integration.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Based on the core Home Assistant [denonavr](https://www.home-assistant.io/integrations/denonavr) integration
-- Uses the [denonavr](https://github.com/ol-iver/denonavr) Python library by @ol-iver
-- Marantz logo trademark of [Marantz](https://www.marantz.com/)
-
-## Support
-
-If you encounter any issues or have questions:
-
-- Check the [Issues](https://github.com/foxey/ha-marantz-plus/issues) page
-- Create a new issue with detailed information about your problem
-- Include Home Assistant logs and your receiver model
+MIT License — see [LICENSE](LICENSE).
 
 ---
 
-**Note**: This is a custom integration and is not officially supported by Home Assistant or Marantz/Denon.
+**Note:** This is a custom integration and is not officially supported by Home
+Assistant, Denon or Marantz.

@@ -1,4 +1,4 @@
-"""Code to handle a Marantz+ compatible receiver."""
+"""Code to handle a Denon/Marantz AVR compatible receiver."""
 
 from __future__ import annotations
 
