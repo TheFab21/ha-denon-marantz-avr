@@ -410,8 +410,12 @@ class ChannelVolumeManager:
                         ", ".join(available_channels),
                     )
                 else:
-                    _LOGGER.warning(
-                        "No active channels detected for %s zone %s",
+                    # Normal when the current sound mode uses only some
+                    # channels (e.g. 2.0 stereo reports only Front L/R): the
+                    # other channels populate later via CV telnet callbacks.
+                    _LOGGER.debug(
+                        "No channel levels reported yet for %s zone %s; "
+                        "they will appear as the receiver reports them",
                         self.receiver.host,
                         self.zone,
                     )
