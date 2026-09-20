@@ -64,3 +64,12 @@ CONTROLS_SCAN_INTERVAL = timedelta(seconds=30)
 DEFAULT_POWER_OFF_DELAY = 5
 DEFAULT_POWER_ON_DELAY = 12
 ECO_MODE_OPTIONS = ["Off", "Auto", "On"]
+
+# Speaker preset slots (the receiver exposes presets 1 and 2)
+SPEAKER_PRESET_OPTIONS = ["1", "2"]
+
+# Audio delay (ms) and sleep timer (minutes) ranges, per the denonavr protocol
+MIN_DELAY_TIME_MS = 0
+MAX_DELAY_TIME_MS = 999
+MIN_SLEEP_MINUTES = 0
+MAX_SLEEP_MINUTES = 120

@@ -3,6 +3,12 @@
     "switch": {
       "dynamic_eq": {
         "default": "mdi:tune"
+      },
+      "bt_transmitter": {
+        "default": "mdi:bluetooth-audio"
+      },
+      "graphic_eq": {
+        "default": "mdi:equalizer"
       }
     },
     "select": {
@@ -17,6 +23,32 @@
       },
       "eco_mode": {
         "default": "mdi:leaf"
+      },
+      "dialog_enhancer": {
+        "default": "mdi:account-voice"
+      },
+      "mdax": {
+        "default": "mdi:sine-wave"
+      },
+      "audio_restorer": {
+        "default": "mdi:sine-wave"
+      },
+      "drc": {
+        "default": "mdi:arrow-collapse-vertical"
+      },
+      "bt_output_mode": {
+        "default": "mdi:bluetooth-audio"
+      },
+      "speaker_preset": {
+        "default": "mdi:speaker-multiple"
+      }
+    },
+    "number": {
+      "audio_delay": {
+        "default": "mdi:timer-cog-outline"
+      },
+      "sleep_timer": {
+        "default": "mdi:timer-outline"
       }
     },
     "button": {

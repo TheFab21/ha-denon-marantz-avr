@@ -89,8 +89,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: DenonavrConfigEntry) -> 
 
     entry.runtime_data = DenonMarantzData(receiver=receiver, controls=controls)
 
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     use_telnet = entry.options.get(CONF_USE_TELNET, DEFAULT_USE_TELNET)
+    if use_telnet:
+        # Push control-entity updates the moment the receiver reports a change.
+        entry.async_on_unload(controls.async_register_telnet_listener())
+
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     async def _async_disconnect(_event: Event) -> None:
         """Disconnect from Telnet."""

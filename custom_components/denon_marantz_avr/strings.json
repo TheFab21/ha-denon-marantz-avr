@@ -60,11 +60,35 @@
       },
       "eco_mode": {
         "name": "Eco mode"
+      },
+      "dialog_enhancer": {
+        "name": "Dialog enhancer"
+      },
+      "mdax": {
+        "name": "M-DAX"
+      },
+      "audio_restorer": {
+        "name": "Audio restorer"
+      },
+      "drc": {
+        "name": "Dynamic range compression"
+      },
+      "bt_output_mode": {
+        "name": "Bluetooth output"
+      },
+      "speaker_preset": {
+        "name": "Speaker preset"
       }
     },
     "switch": {
       "dynamic_eq": {
         "name": "Dynamic EQ"
+      },
+      "bt_transmitter": {
+        "name": "Bluetooth transmitter"
+      },
+      "graphic_eq": {
+        "name": "Graphic EQ"
       }
     },
     "button": {
@@ -73,6 +97,14 @@
       },
       "recover_audio": {
         "name": "Recover audio"
+      }
+    },
+    "number": {
+      "audio_delay": {
+        "name": "Audio delay"
+      },
+      "sleep_timer": {
+        "name": "Sleep timer"
       }
     }
   },

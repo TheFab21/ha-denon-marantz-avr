@@ -60,11 +60,35 @@
             },
             "eco_mode": {
                 "name": "Mode Éco"
+            },
+            "dialog_enhancer": {
+                "name": "Amélioration des dialogues"
+            },
+            "mdax": {
+                "name": "M-DAX"
+            },
+            "audio_restorer": {
+                "name": "Restaurateur audio"
+            },
+            "drc": {
+                "name": "Compression dynamique (DRC)"
+            },
+            "bt_output_mode": {
+                "name": "Sortie Bluetooth"
+            },
+            "speaker_preset": {
+                "name": "Préréglage d'enceintes"
             }
         },
         "switch": {
             "dynamic_eq": {
                 "name": "Égaliseur dynamique"
+            },
+            "bt_transmitter": {
+                "name": "Émetteur Bluetooth"
+            },
+            "graphic_eq": {
+                "name": "Égaliseur graphique"
             }
         },
         "button": {
@@ -73,6 +97,14 @@
             },
             "recover_audio": {
                 "name": "Récupérer l'audio"
+            }
+        },
+        "number": {
+            "audio_delay": {
+                "name": "Délai audio"
+            },
+            "sleep_timer": {
+                "name": "Minuterie de sommeil"
             }
         }
     },

@@ -31,6 +31,7 @@ Home Assistant:
 | **Channel volume** | Per-channel trim (Front L/R, Center, Surround L/R, Subwoofer) as `number` entities in dB |
 | **Audyssey** | Dynamic EQ (`switch`), Dynamic Volume / Reference Level Offset / MultiEQ (`select`) |
 | **Eco mode** | Off / Auto / On (`select`) |
+| **Advanced audio** | Dialog Enhancer, M‑DAX / Audio Restorer, DRC, Bluetooth output, Speaker preset (`select`); Bluetooth transmitter, Graphic EQ (`switch`); audio delay, sleep timer (`number`) — capability-detected, Telnet only |
 | **Buttons** | Refresh Audyssey, Recover audio (soft power-cycle that restores the previous input) |
 | **Services** | `get_command`, `set_dynamic_eq`, `update_audyssey` |
 
@@ -77,10 +78,17 @@ After setup, open the integration options to configure:
 All entities are grouped under a single Home Assistant device per receiver:
 
 - `media_player.*` — one per active zone
-- `number.*` — per-channel volume trim
-- `switch.*_dynamic_eq`
-- `select.*_dynamic_volume`, `*_reference_level_offset`, `*_multi_eq`, `*_eco_mode`
-- `button.*_refresh_audyssey`, `*_recover_audio`
+- `number.*` — per-channel volume trim, plus audio delay and sleep timer
+- `switch.*` — Dynamic EQ, Bluetooth transmitter, Graphic EQ
+- `select.*` — Dynamic Volume, Reference Level Offset, MultiEQ, Eco mode, Dialog
+  Enhancer, M‑DAX / Audio Restorer, DRC, Bluetooth output, Speaker preset
+- `button.*` — Refresh Audyssey, Recover audio
+
+> The advanced audio entities (Dialog Enhancer, M‑DAX, DRC, delay, sleep,
+> Bluetooth, Graphic EQ, Speaker preset) are **created only when your receiver
+> reports that setting** over its Telnet connection — option lists come from the
+> `denonavr` library, nothing is hard-coded — so you only see the controls your
+> model actually supports. Keep the **Telnet** option enabled for them to appear.
 
 ## Services
 

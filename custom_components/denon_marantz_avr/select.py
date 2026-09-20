@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, get_args
 
+from denonavr.const import (
+    AudioRestorers,
+    BluetoothOutputModes,
+    DialogEnhancerLevels,
+    DRCs,
+    MDAXs,
+)
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 
-from .const import ECO_MODE_OPTIONS
+from .const import ECO_MODE_OPTIONS, SPEAKER_PRESET_OPTIONS
 from .entity import DenonControlsEntity
 
 if TYPE_CHECKING:
@@ -29,6 +36,21 @@ class AudysseySelectDescription(SelectEntityDescription):
     set_fn: Callable[[str], Awaitable[None]]
 
 
+@dataclass(frozen=True, kw_only=True)
+class AvrSelectDescription(SelectEntityDescription):
+    """
+    Describe a receiver setting exposed as a select.
+
+    ``options`` and the current value both come from the ``denonavr`` library
+    so nothing is hard-coded here, and the entity is only created when the
+    receiver actually reports a value for the setting (see ``async_setup_entry``).
+    """
+
+    option_list: list[str]
+    value_fn: Callable[[], str | None]
+    set_fn: Callable[[str], Awaitable[None]]
+
+
 async def async_setup_entry(
     hass: HomeAssistant,  # noqa: ARG001
     entry: DenonavrConfigEntry,
@@ -36,36 +58,94 @@ async def async_setup_entry(
 ) -> None:
     """Set up receiver select controls."""
     coordinator = entry.runtime_data.controls
-    audyssey = coordinator.receiver.audyssey
-    descriptions = (
-        AudysseySelectDescription(
-            key="dynamic_volume",
-            translation_key="dynamic_volume",
-            value_fn=lambda: audyssey.dynamic_volume,
-            options_fn=lambda: audyssey.dynamic_volume_setting_list,
-            set_fn=audyssey.async_set_dynamicvol,
+    receiver = coordinator.receiver
+    audyssey = receiver.audyssey
+
+    entities: list[SelectEntity] = [
+        AudysseySelect(coordinator, description)
+        for description in (
+            AudysseySelectDescription(
+                key="dynamic_volume",
+                translation_key="dynamic_volume",
+                value_fn=lambda: audyssey.dynamic_volume,
+                options_fn=lambda: audyssey.dynamic_volume_setting_list,
+                set_fn=audyssey.async_set_dynamicvol,
+            ),
+            AudysseySelectDescription(
+                key="reference_level_offset",
+                translation_key="reference_level_offset",
+                value_fn=lambda: audyssey.reference_level_offset,
+                options_fn=lambda: audyssey.reference_level_offset_setting_list,
+                set_fn=audyssey.async_set_reflevoffset,
+            ),
+            AudysseySelectDescription(
+                key="multi_eq",
+                translation_key="multi_eq",
+                value_fn=lambda: audyssey.multi_eq,
+                options_fn=lambda: audyssey.multi_eq_setting_list,
+                set_fn=audyssey.async_set_multieq,
+            ),
+        )
+    ]
+    entities.append(EcoModeSelect(coordinator))
+
+    # Receiver settings pushed over Telnet. Each is only added when the
+    # receiver reports a value for it, i.e. the model actually supports it.
+    avr_descriptions = (
+        AvrSelectDescription(
+            key="dialog_enhancer",
+            translation_key="dialog_enhancer",
+            option_list=list(get_args(DialogEnhancerLevels)),
+            value_fn=lambda: receiver.dialog_enhancer,
+            set_fn=receiver.async_dialog_enhancer,
         ),
-        AudysseySelectDescription(
-            key="reference_level_offset",
-            translation_key="reference_level_offset",
-            value_fn=lambda: audyssey.reference_level_offset,
-            options_fn=lambda: audyssey.reference_level_offset_setting_list,
-            set_fn=audyssey.async_set_reflevoffset,
+        AvrSelectDescription(
+            key="mdax",
+            translation_key="mdax",
+            option_list=list(get_args(MDAXs)),
+            value_fn=lambda: receiver.mdax,
+            set_fn=receiver.async_mdax,
         ),
-        AudysseySelectDescription(
-            key="multi_eq",
-            translation_key="multi_eq",
-            value_fn=lambda: audyssey.multi_eq,
-            options_fn=lambda: audyssey.multi_eq_setting_list,
-            set_fn=audyssey.async_set_multieq,
+        AvrSelectDescription(
+            key="audio_restorer",
+            translation_key="audio_restorer",
+            option_list=list(get_args(AudioRestorers)),
+            value_fn=lambda: receiver.audio_restorer,
+            set_fn=receiver.async_audio_restorer,
+        ),
+        AvrSelectDescription(
+            key="drc",
+            translation_key="drc",
+            option_list=list(get_args(DRCs)),
+            value_fn=lambda: receiver.drc,
+            set_fn=receiver.async_drc,
+        ),
+        AvrSelectDescription(
+            key="bt_output_mode",
+            translation_key="bt_output_mode",
+            option_list=list(get_args(BluetoothOutputModes)),
+            value_fn=lambda: receiver.bt_output_mode,
+            set_fn=receiver.async_bt_output_mode,
+        ),
+        AvrSelectDescription(
+            key="speaker_preset",
+            translation_key="speaker_preset",
+            option_list=list(SPEAKER_PRESET_OPTIONS),
+            value_fn=lambda: (
+                None
+                if receiver.speaker_preset is None
+                else str(receiver.speaker_preset)
+            ),
+            set_fn=lambda option: receiver.async_speaker_preset(int(option)),
         ),
     )
-    async_add_entities(
-        [
-            *(AudysseySelect(coordinator, description) for description in descriptions),
-            EcoModeSelect(coordinator),
-        ]
+    entities.extend(
+        AvrSelect(coordinator, description)
+        for description in avr_descriptions
+        if description.value_fn() is not None
     )
+
+    async_add_entities(entities)
 
 
 class AudysseySelect(DenonControlsEntity, SelectEntity):
@@ -128,3 +208,29 @@ class EcoModeSelect(DenonControlsEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         """Change the Eco mode."""
         await self.coordinator.async_set_eco_mode(option)
+
+
+class AvrSelect(DenonControlsEntity, SelectEntity):
+    """Represent a receiver setting backed by the denonavr library."""
+
+    def __init__(
+        self,
+        coordinator: DenonControlsCoordinator,
+        description: AvrSelectDescription,
+    ) -> None:
+        """Initialize the select."""
+        super().__init__(coordinator, description.key)
+        self.entity_description = description
+        self._attr_translation_key = description.translation_key
+        self._attr_options = list(description.option_list)
+
+    @property
+    def current_option(self) -> str | None:
+        """Return the current setting."""
+        return self.entity_description.value_fn()
+
+    async def async_select_option(self, option: str) -> None:
+        """Change the setting."""
+        await self.coordinator.async_send(
+            lambda: self.entity_description.set_fn(option)
+        )

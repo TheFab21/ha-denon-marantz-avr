@@ -15,7 +15,9 @@ import contextlib
 import logging
 from typing import TYPE_CHECKING
 
+from denonavr.const import ALL_TELNET_EVENTS
 from denonavr.exceptions import DenonAvrError
+from homeassistant.core import callback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -53,6 +55,34 @@ class DenonControlsCoordinator(DataUpdateCoordinator[None]):
         self.receiver = receiver
         self.device_id = device_id
         self.command_lock = asyncio.Lock()
+
+    @callback
+    def async_register_telnet_listener(self) -> Callable[[], None]:
+        """
+        Refresh the control entities in real time on Telnet events.
+
+        Many of the receiver's extra settings (Dialog Enhancer, M-DAX, audio
+        delay, Bluetooth transmitter, ...) are only pushed over Telnet. The
+        30 s poll already reads their current value, but registering for
+        Telnet events lets the controls update immediately. Returns a
+        callback that unregisters the listener.
+        """
+
+        def _telnet_callback(zone: str, event: str, parameter: str) -> None:  # noqa: ARG001
+            self.async_set_updated_data(None)
+
+        self.receiver.register_callback(ALL_TELNET_EVENTS, _telnet_callback)
+
+        def _unregister() -> None:
+            self.receiver.unregister_callback(ALL_TELNET_EVENTS, _telnet_callback)
+
+        return _unregister
+
+    async def async_send(self, command: Callable[[], Awaitable[None]]) -> None:
+        """Run a single receiver command, serialized, then refresh entities."""
+        async with self.command_lock:
+            await command()
+        self.async_set_updated_data(None)
 
     async def _async_update_data(self) -> None:
         """
