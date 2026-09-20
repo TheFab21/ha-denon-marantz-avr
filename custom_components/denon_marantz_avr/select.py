@@ -12,6 +12,7 @@ from denonavr.const import (
     DRCs,
     MDAXs,
 )
+from denonavr.exceptions import DenonAvrError
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 
 from .const import ECO_MODE_OPTIONS, SPEAKER_PRESET_OPTIONS
@@ -60,6 +61,9 @@ async def async_setup_entry(
     coordinator = entry.runtime_data.controls
     receiver = coordinator.receiver
     audyssey = receiver.audyssey
+    # Dialog Enhancer, M-DAX and DRC live on the sound-mode sub-component,
+    # not on the top-level receiver facade.
+    soundmode = receiver.soundmode
 
     entities: list[SelectEntity] = [
         AudysseySelect(coordinator, description)
@@ -96,15 +100,15 @@ async def async_setup_entry(
             key="dialog_enhancer",
             translation_key="dialog_enhancer",
             option_list=list(get_args(DialogEnhancerLevels)),
-            value_fn=lambda: receiver.dialog_enhancer,
-            set_fn=receiver.async_dialog_enhancer,
+            value_fn=lambda: soundmode.dialog_enhancer,
+            set_fn=soundmode.async_dialog_enhancer,
         ),
         AvrSelectDescription(
             key="mdax",
             translation_key="mdax",
             option_list=list(get_args(MDAXs)),
-            value_fn=lambda: receiver.mdax,
-            set_fn=receiver.async_mdax,
+            value_fn=lambda: soundmode.mdax,
+            set_fn=soundmode.async_mdax,
         ),
         AvrSelectDescription(
             key="audio_restorer",
@@ -117,8 +121,8 @@ async def async_setup_entry(
             key="drc",
             translation_key="drc",
             option_list=list(get_args(DRCs)),
-            value_fn=lambda: receiver.drc,
-            set_fn=receiver.async_drc,
+            value_fn=lambda: soundmode.drc,
+            set_fn=soundmode.async_drc,
         ),
         AvrSelectDescription(
             key="bt_output_mode",
@@ -139,11 +143,15 @@ async def async_setup_entry(
             set_fn=lambda option: receiver.async_speaker_preset(int(option)),
         ),
     )
-    entities.extend(
-        AvrSelect(coordinator, description)
-        for description in avr_descriptions
-        if description.value_fn() is not None
-    )
+    for description in avr_descriptions:
+        try:
+            supported = description.value_fn() is not None
+        except (AttributeError, DenonAvrError):
+            # A property the installed library version does not expose, or a
+            # read that failed: skip this control rather than failing setup.
+            supported = False
+        if supported:
+            entities.append(AvrSelect(coordinator, description))
 
     async_add_entities(entities)
 
