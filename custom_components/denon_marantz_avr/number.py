@@ -13,6 +13,8 @@ from .channel_volume import ChannelVolumeManager
 from .const import (
     CONF_MANUFACTURER,
     CONF_SERIAL_NUMBER,
+    CONF_USE_TELNET,
+    DEFAULT_USE_TELNET,
     DOMAIN,
     MAX_DELAY_TIME_MS,
     MAX_SLEEP_MINUTES,
@@ -40,14 +42,13 @@ async def async_setup_entry(
     coordinator = config_entry.runtime_data.controls
     receiver = coordinator.receiver
 
-    # Telnet-only receiver settings, only added when the receiver reports them.
-    control_numbers: list[NumberEntity] = []
-    if receiver.delay_time is not None:
-        control_numbers.append(AudioDelayNumber(coordinator))
-    if receiver.sleep is not None:
-        control_numbers.append(SleepTimerNumber(coordinator))
-    if control_numbers:
-        async_add_entities(control_numbers)
+    # Telnet-only receiver settings. They arrive asynchronously after connect,
+    # so they are created whenever Telnet is enabled (not gated on the racy
+    # initial value) and populate once the receiver reports them.
+    if config_entry.options.get(CONF_USE_TELNET, DEFAULT_USE_TELNET):
+        async_add_entities(
+            [AudioDelayNumber(coordinator), SleepTimerNumber(coordinator)]
+        )
 
     entities = []
     managers = []

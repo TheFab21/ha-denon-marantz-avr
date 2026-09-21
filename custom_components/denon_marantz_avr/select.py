@@ -12,10 +12,15 @@ from denonavr.const import (
     DRCs,
     MDAXs,
 )
-from denonavr.exceptions import DenonAvrError
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 
-from .const import ECO_MODE_OPTIONS, SOUND_CATEGORY_OPTIONS, SPEAKER_PRESET_OPTIONS
+from .const import (
+    CONF_USE_TELNET,
+    DEFAULT_USE_TELNET,
+    ECO_MODE_OPTIONS,
+    SOUND_CATEGORY_OPTIONS,
+    SPEAKER_PRESET_OPTIONS,
+)
 from .entity import DenonControlsEntity
 
 if TYPE_CHECKING:
@@ -93,8 +98,11 @@ async def async_setup_entry(
     ]
     entities.append(EcoModeSelect(coordinator))
 
-    # Receiver settings pushed over Telnet. Each is only added when the
-    # receiver reports a value for it, i.e. the model actually supports it.
+    # Receiver settings pushed over Telnet. These arrive asynchronously over
+    # several seconds after connect, so gating on the instantaneous value is
+    # racy; instead create them when Telnet is enabled (the transport that
+    # carries them), restricting the brand-specific ones. Each shows "unknown"
+    # until the receiver reports its value.
     avr_descriptions = (
         AvrSelectDescription(
             key="dialog_enhancer",
@@ -143,15 +151,22 @@ async def async_setup_entry(
             set_fn=lambda option: receiver.async_speaker_preset(int(option)),
         ),
     )
-    for description in avr_descriptions:
-        try:
-            supported = description.value_fn() is not None
-        except (AttributeError, DenonAvrError):
-            # A property the installed library version does not expose, or a
-            # read that failed: skip this control rather than failing setup.
-            supported = False
-        if supported:
-            entities.append(AvrSelect(coordinator, description))
+    if entry.options.get(CONF_USE_TELNET, DEFAULT_USE_TELNET):
+        manufacturer = (receiver.manufacturer or "").lower()
+        is_marantz = "marantz" in manufacturer
+        is_denon = "denon" in manufacturer
+        include = {"dialog_enhancer", "drc", "bt_output_mode", "speaker_preset"}
+        # M-DAX is Marantz-only, Audio Restorer is Denon-only; include both
+        # when the manufacturer is unknown so nothing is missed.
+        if is_marantz or not is_denon:
+            include.add("mdax")
+        if is_denon or not is_marantz:
+            include.add("audio_restorer")
+        entities.extend(
+            AvrSelect(coordinator, description)
+            for description in avr_descriptions
+            if description.key in include
+        )
 
     # Sound-mode category (genre), from the web API, when the receiver
     # reports one.

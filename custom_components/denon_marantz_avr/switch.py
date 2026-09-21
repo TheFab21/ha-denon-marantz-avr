@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.switch import SwitchEntity
 
+from .const import CONF_USE_TELNET, DEFAULT_USE_TELNET
 from .entity import DenonControlsEntity
 
 if TYPE_CHECKING:
@@ -23,14 +24,14 @@ async def async_setup_entry(
 ) -> None:
     """Set up switch controls."""
     coordinator = entry.runtime_data.controls
-    receiver = coordinator.receiver
 
     entities: list[SwitchEntity] = [DynamicEqSwitch(coordinator)]
 
-    # Telnet-only settings: only added when the receiver reports them.
-    if receiver.bt_transmitter is not None:
+    # Telnet-only settings. They arrive asynchronously after connect, so they
+    # are created whenever Telnet is enabled (not gated on the racy initial
+    # value) and show their state once the receiver reports it.
+    if entry.options.get(CONF_USE_TELNET, DEFAULT_USE_TELNET):
         entities.append(BluetoothTransmitterSwitch(coordinator))
-    if receiver.graphic_eq is not None:
         entities.append(GraphicEqSwitch(coordinator))
 
     async_add_entities(entities)
