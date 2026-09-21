@@ -1,7 +1,9 @@
 # Denon & Marantz AVR for Home Assistant
 
-[![GitHub Release](https://img.shields.io/github/v/release/TheFab21/ha-denon-marantz-avr?style=flat)](https://github.com/TheFab21/ha-denon-marantz-avr/releases/latest)
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
+[![GitHub Release](https://img.shields.io/github/v/release/TheFab21/ha-denon-marantz-avr?style=flat&color=blue)](https://github.com/TheFab21/ha-denon-marantz-avr/releases/latest)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-%3E%3D2025.1.0-green.svg)](https://www.home-assistant.io)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A **complete** custom Home Assistant integration for Denon and Marantz A/V
 network receivers. It merges three community projects into a single component
@@ -20,16 +22,22 @@ Home Assistant:
 > across Home Assistant upgrades. You can even run it side by side with the
 > official integration while you migrate.
 
+If this project is useful to you, you can support its development:
+
+<a href="https://buymeacoffee.com/thefab21" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-black.png" alt="Buy Me A Coffee" height="41" width="174"></a>
+
 ## Features
 
 | Area | What you get |
 |------|--------------|
 | **Media player** | Power, volume (set/step/mute), source selection, sound-mode selection, transport controls and now-playing metadata for network sources |
 | **Real sound-mode list** | On recent receivers (HEOS-era, port 11080) the sound-mode list is read live from the device, so only the modes actually available for the current input are shown — with automatic fallback to the library list on older models |
+| **Sound category** | On recent receivers, a sound-mode category (genre) selector read live from the device — picking a category re-shapes the surround modes the media player then offers (`select`) |
 | **HEOS streaming** | Optional second media player (same device) for HEOS Built-in: now-playing with cover art, transport, favorites & inputs as sources, repeat/shuffle and media browsing — via `pyheos`. Created only when the receiver has HEOS; nothing changes on older models |
 | **Multi-zone** | Main Zone plus optional Zone 2 and Zone 3 as separate entities |
 | **Real-time updates** | Telnet push connection (`local_push`) for instant state changes, with HTTP fallback |
 | **Discovery** | SSDP auto-discovery of Denon, Denon Professional and Marantz receivers |
+| **Native brand icon** | Ships its own icon bundled in the integration, served by Home Assistant 2026.3+ via the local brands proxy — no separate `home-assistant/brands` submission needed |
 | **Channel volume** | Per-channel trim (Front L/R, Center, Surround L/R, Subwoofer) as `number` entities in dB |
 | **Audyssey** | Dynamic EQ (`switch`), Dynamic Volume / Reference Level Offset / MultiEQ (`select`) |
 | **Eco mode** | Off / Auto / On (`select`) |
@@ -83,7 +91,8 @@ All entities are grouped under a single Home Assistant device per receiver:
 - `number.*` — per-channel volume trim, plus audio delay and sleep timer
 - `switch.*` — Dynamic EQ, Bluetooth transmitter, Graphic EQ
 - `select.*` — Dynamic Volume, Reference Level Offset, MultiEQ, Eco mode, Dialog
-  Enhancer, M‑DAX / Audio Restorer, DRC, Bluetooth output, Speaker preset
+  Enhancer, M‑DAX / Audio Restorer, DRC, Bluetooth output, Speaker preset, Sound
+  category
 - `button.*` — Refresh Audyssey, Recover audio
 
 > The advanced audio entities (Dialog Enhancer, M‑DAX, DRC, delay, sleep,
@@ -163,6 +172,13 @@ This project unifies and builds on the work of several community projects:
   [@ol-iver](https://github.com/ol-iver).
 - Based on the core Home Assistant
   [denonavr](https://www.home-assistant.io/integrations/denonavr) integration.
+
+## Support
+
+If this integration is useful to you, a coffee is always appreciated and helps
+keep development going:
+
+<a href="https://buymeacoffee.com/thefab21" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-black.png" alt="Buy Me A Coffee" height="41" width="174"></a>
 
 ## License
 
