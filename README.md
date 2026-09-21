@@ -26,6 +26,7 @@ Home Assistant:
 |------|--------------|
 | **Media player** | Power, volume (set/step/mute), source selection, sound-mode selection, transport controls and now-playing metadata for network sources |
 | **Real sound-mode list** | On recent receivers (HEOS-era, port 11080) the sound-mode list is read live from the device, so only the modes actually available for the current input are shown — with automatic fallback to the library list on older models |
+| **HEOS streaming** | Optional second media player (same device) for HEOS Built-in: now-playing with cover art, transport, favorites & inputs as sources, repeat/shuffle and media browsing — via `pyheos`. Created only when the receiver has HEOS; nothing changes on older models |
 | **Multi-zone** | Main Zone plus optional Zone 2 and Zone 3 as separate entities |
 | **Real-time updates** | Telnet push connection (`local_push`) for instant state changes, with HTTP fallback |
 | **Discovery** | SSDP auto-discovery of Denon, Denon Professional and Marantz receivers |

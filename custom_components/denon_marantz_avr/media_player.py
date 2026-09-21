@@ -46,6 +46,7 @@ from .const import (
     DEFAULT_UPDATE_AUDYSSEY,
     DOMAIN,
 )
+from .heos_media_player import HeosStreamingPlayer
 from .webapi import (
     SoundModeSettings,
     async_get_sound_mode_settings,
@@ -143,6 +144,12 @@ async def async_setup_entry(
                 update_audyssey,
             )
         )
+    # Optional HEOS network-streaming player on the same device.
+    heos = config_entry.runtime_data.heos
+    if heos is not None and heos.player is not None:
+        device_id = config_entry.unique_id or config_entry.entry_id
+        entities.append(HeosStreamingPlayer(heos, device_id))
+
     _LOGGER.debug(
         "%s receiver at host %s initialized", receiver.manufacturer, receiver.host
     )

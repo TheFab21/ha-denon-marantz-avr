@@ -40,6 +40,7 @@ from .const import (
     PLATFORMS,
 )
 from .coordinator import DenonControlsCoordinator
+from .heos import HeosStreaming
 from .receiver import ConnectDenonAVR
 
 if TYPE_CHECKING:
@@ -55,6 +56,7 @@ class DenonMarantzData:
 
     receiver: DenonAVR
     controls: DenonControlsCoordinator
+    heos: HeosStreaming | None = None
 
 
 type DenonavrConfigEntry = ConfigEntry[DenonMarantzData]
@@ -87,7 +89,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: DenonavrConfigEntry) -> 
     controls = DenonControlsCoordinator(hass, receiver, device_id)
     await controls.async_config_entry_first_refresh()
 
-    entry.runtime_data = DenonMarantzData(receiver=receiver, controls=controls)
+    # Optional HEOS network-streaming player (best-effort; only when the
+    # receiver has HEOS Built-in and a player matching this host is found).
+    heos = HeosStreaming(entry.data[CONF_HOST])
+    if not await heos.async_connect():
+        heos = None
+
+    entry.runtime_data = DenonMarantzData(
+        receiver=receiver, controls=controls, heos=heos
+    )
 
     use_telnet = entry.options.get(CONF_USE_TELNET, DEFAULT_USE_TELNET)
     if use_telnet:
@@ -120,6 +130,9 @@ async def async_unload_entry(
     if config_entry.options.get(CONF_USE_TELNET, DEFAULT_USE_TELNET):
         receiver = config_entry.runtime_data.receiver
         await receiver.async_telnet_disconnect()
+
+    if config_entry.runtime_data.heos is not None:
+        await config_entry.runtime_data.heos.async_disconnect()
 
     # Remove zone2 and zone3 entities if needed
     entity_registry = er.async_get(hass)

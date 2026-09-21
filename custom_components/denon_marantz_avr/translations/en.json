@@ -109,6 +109,11 @@
             "sleep_timer": {
                 "name": "Sleep timer"
             }
+        },
+        "media_player": {
+            "streaming": {
+                "name": "HEOS streaming"
+            }
         }
     },
     "services": {

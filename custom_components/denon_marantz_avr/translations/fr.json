@@ -109,6 +109,11 @@
             "sleep_timer": {
                 "name": "Minuterie de sommeil"
             }
+        },
+        "media_player": {
+            "streaming": {
+                "name": "Streaming HEOS"
+            }
         }
     },
     "services": {
