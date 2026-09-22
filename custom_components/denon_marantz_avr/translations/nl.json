@@ -81,6 +81,9 @@
             },
             "sound_category": {
                 "name": "Geluidscategorie"
+            },
+            "sound_mode": {
+                "name": "Geluidsmodus"
             }
         },
         "switch": {

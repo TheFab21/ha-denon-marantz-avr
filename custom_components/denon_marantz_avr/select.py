@@ -31,6 +31,7 @@ if TYPE_CHECKING:
 
     from . import DenonavrConfigEntry
     from .coordinator import DenonControlsCoordinator
+    from .webapi import SoundModeSettings
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -177,6 +178,17 @@ async def async_setup_entry(
     ):
         entities.append(SoundCategorySelect(coordinator))
 
+    # Sound mode as a stand-alone dropdown (in addition to the media player's
+    # own control). Prefer the real device-reported list from the web API, and
+    # fall back to the denonavr list on receivers without the web API.
+    web_modes = (
+        coordinator.sound_modes
+        if coordinator.web_available and coordinator.sound_modes is not None
+        else None
+    )
+    if (web_modes is not None and web_modes.names) or receiver.sound_mode_list:
+        entities.append(SoundModeSelect(coordinator))
+
     async_add_entities(entities)
 
 
@@ -298,3 +310,56 @@ class SoundCategorySelect(DenonControlsEntity, SelectEntity):
         """Change the sound category."""
         index = SOUND_CATEGORY_OPTIONS.index(option) + 1
         await self.coordinator.async_set_sound_category(index)
+
+
+class SoundModeSelect(DenonControlsEntity, SelectEntity):
+    """
+    Select the active sound mode as a stand-alone dropdown.
+
+    Mirrors the media player's sound-mode control. It prefers the real,
+    device-reported list from the web API (only the modes actually available
+    for the current input) and falls back to the ``denonavr`` list on
+    receivers without that API.
+    """
+
+    _attr_translation_key = "sound_mode"
+
+    def __init__(self, coordinator: DenonControlsCoordinator) -> None:
+        """Initialize the sound mode select."""
+        super().__init__(coordinator, "sound_mode")
+
+    @property
+    def _web_modes(self) -> SoundModeSettings | None:
+        """Return the web-API sound modes when they are usable."""
+        settings = self.coordinator.sound_modes
+        if self.coordinator.web_available and settings is not None and settings.names:
+            return settings
+        return None
+
+    @property
+    def options(self) -> list[str]:
+        """Return the selectable sound modes."""
+        web = self._web_modes
+        if web is not None:
+            return list(web.names)
+        return list(self.coordinator.receiver.sound_mode_list or [])
+
+    @property
+    def current_option(self) -> str | None:
+        """Return the current sound mode."""
+        web = self._web_modes
+        if web is not None:
+            return web.current
+        return self.coordinator.receiver.sound_mode
+
+    async def async_select_option(self, option: str) -> None:
+        """Change the sound mode."""
+        web = self._web_modes
+        if web is not None:
+            index = web.index_for(option)
+            if index is not None:
+                await self.coordinator.async_set_sound_mode(index)
+                return
+        await self.coordinator.async_send(
+            lambda: self.coordinator.receiver.async_set_sound_mode(option)
+        )

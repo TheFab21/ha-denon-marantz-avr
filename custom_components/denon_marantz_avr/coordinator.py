@@ -27,7 +27,11 @@ from .const import (
     DEFAULT_POWER_ON_DELAY,
     DOMAIN,
 )
-from .webapi import async_get_sound_mode_settings, async_select_genre
+from .webapi import (
+    async_get_sound_mode_settings,
+    async_select_genre,
+    async_select_sound_mode,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -81,6 +85,13 @@ class DenonControlsCoordinator(DataUpdateCoordinator[None]):
     async def async_set_sound_category(self, index: int) -> None:
         """Select a sound-mode category (genre) and refresh."""
         await async_select_genre(get_async_client(self.hass), self.receiver.host, index)
+        await self.async_request_refresh()
+
+    async def async_set_sound_mode(self, index: int) -> None:
+        """Select a sound mode by its web-API index and refresh."""
+        await async_select_sound_mode(
+            get_async_client(self.hass), self.receiver.host, index
+        )
         await self.async_request_refresh()
 
     @callback

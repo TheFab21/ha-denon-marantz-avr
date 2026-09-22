@@ -81,6 +81,9 @@
             },
             "sound_category": {
                 "name": "Sound category"
+            },
+            "sound_mode": {
+                "name": "Sound mode"
             }
         },
         "switch": {
