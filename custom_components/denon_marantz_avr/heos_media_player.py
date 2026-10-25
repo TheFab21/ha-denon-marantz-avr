@@ -324,6 +324,21 @@ class HeosStreamingPlayer(MediaPlayerEntity):
             if not isinstance(media, MediaItem):
                 msg = f"Invalid media id: {media_id}"
                 raise HomeAssistantError(msg)
+            if media.type == HeosMediaType.CONTAINER and media.container_id is not None:
+                # Play a whole folder/container (e.g. a DLNA directory). HEOS
+                # enqueues the container by id; play_media() would refuse it
+                # when the folder is not individually flagged "playable". The
+                # default criteria (REPLACE_AND_PLAY) clears the queue and
+                # starts playback, matching the HEOS app's folder play.
+                await self._run(
+                    "play folder",
+                    self._player.add_to_queue(
+                        source_id=media.source_id,
+                        container_id=media.container_id,
+                        add_criteria=enqueue,
+                    ),
+                )
+                return
             await self._run("play media", self._player.play_media(media, enqueue))
             return
         if media_source.is_media_source_id(media_id):
@@ -429,7 +444,13 @@ def _media_to_browse_media(media: MediaItem | MediaMusicSource) -> BrowseMedia:
         can_play = False
     else:
         can_expand = media.browsable
-        can_play = media.playable
+        # A container (e.g. a DLNA folder or album) can be played as a whole
+        # even when HEOS does not flag the folder itself as "playable": it is
+        # enqueued by its container id. Offer a play action for any container
+        # that carries one, in addition to individually playable items.
+        can_play = media.playable or (
+            media.type == HeosMediaType.CONTAINER and media.container_id is not None
+        )
     return BrowseMedia(
         can_expand=can_expand,
         can_play=can_play,
