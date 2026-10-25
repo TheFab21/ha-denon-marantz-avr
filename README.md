@@ -54,10 +54,22 @@ If this project is useful to you, you can support its development:
 
 ## Installation
 
-### HACS (recommended)
+### HACS — custom repository (recommended)
+
+This integration is distributed as a **HACS custom repository**. It is not in
+the HACS default store on purpose: HACS does not list integrations that overlap
+with a Home Assistant core integration (here, the core `denonavr`), so a custom
+repository is the intended way to install it. Installation and updates then work
+exactly like any other HACS integration.
+
+**One click** (Home Assistant 2025.x+ with HACS installed):
+
+[![Open your Home Assistant instance and open this repository inside HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=TheFab21&repository=ha-denon-marantz-avr&category=integration)
+
+**Or manually:**
 
 1. In HACS, open the three-dot menu → **Custom repositories**.
-2. Add `https://github.com/thefab21/ha-denon-marantz-avr` with category **Integration**.
+2. Add `https://github.com/TheFab21/ha-denon-marantz-avr` with category **Integration**.
 3. Install **Denon & Marantz AVR** and restart Home Assistant.
 
 ### Manual
