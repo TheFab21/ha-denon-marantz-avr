@@ -64,6 +64,12 @@ _LOGGER = logging.getLogger(__name__)
 
 BROWSE_ROOT = "heos://media"
 
+# HEOS returns large containers one page at a time. Request this many items
+# per page and stop after this many in total, to guard against a source that
+# ignores the requested range.
+_BROWSE_PAGE_SIZE = 100
+_BROWSE_MAX_ITEMS = 5000
+
 BASE_SUPPORTED_FEATURES = (
     MediaPlayerEntityFeature.VOLUME_MUTE
     | MediaPlayerEntityFeature.VOLUME_SET
@@ -377,10 +383,10 @@ class HeosStreamingPlayer(MediaPlayerEntity):
             media, _data = heos_source.from_media_uri(media_content_id)
             browse_media = _media_to_browse_media(media)
             with suppress(HeosError):
-                result = await self._streaming.heos.browse_media(media)
+                items = await self._browse_all_items(media)
                 browse_media.children = [
                     _media_to_browse_media(item)
-                    for item in result.items
+                    for item in items
                     if item.browsable or item.playable
                 ]
             return browse_media
@@ -388,6 +394,37 @@ class HeosStreamingPlayer(MediaPlayerEntity):
             return await self._async_browse_media_source(media_content_id)
         msg = f"Unsupported media content id: {media_content_id}"
         raise HomeAssistantError(msg)
+
+    async def _browse_all_items(
+        self, media: MediaItem | MediaMusicSource
+    ) -> list[MediaItem]:
+        """
+        Browse a HEOS media item, following pagination.
+
+        HEOS returns large containers (e.g. big DLNA folders) one page at a
+        time, so keep requesting the next range until every reported item has
+        been retrieved. ``count`` is 0 when the source does not report a
+        total; paging then stops once a page returns nothing. A hard cap
+        guards against a source that ignores the requested range.
+        """
+        result = await self._streaming.heos.browse_media(media)
+        items: list[MediaItem] = list(result.items)
+        offset = result.returned
+        while (
+            result.returned > 0
+            and offset < _BROWSE_MAX_ITEMS
+            and (result.count == 0 or offset < result.count)
+        ):
+            result = await self._streaming.heos.browse_media(
+                media,
+                range_start=offset,
+                range_end=offset + _BROWSE_PAGE_SIZE - 1,
+            )
+            if result.returned == 0:
+                break
+            items.extend(result.items)
+            offset += result.returned
+        return items
 
     async def _async_browse_root(self) -> BrowseMedia:
         heos = self._streaming.heos
