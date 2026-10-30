@@ -37,11 +37,15 @@
         "step": {
             "init": {
                 "data": {
+                    "folder_art_url": "URL du service d'illustration de dossier (optionnel)",
                     "show_all_sources": "Afficher toutes les sources",
                     "update_audyssey": "Mettre à jour les paramètres Audyssey",
                     "use_telnet": "Utiliser la connexion Telnet",
                     "zone2": "Configurer la Zone 2",
                     "zone3": "Configurer la Zone 3"
+                },
+                "data_description": {
+                    "folder_art_url": "Service HTTP optionnel qui renvoie l'illustration des dossiers HEOS/DLNA qui n'en fournissent pas (ex. un service de pochettes MiniDLNA). Laisser vide pour désactiver."
                 },
                 "description": "Spécifier les paramètres optionnels"
             }

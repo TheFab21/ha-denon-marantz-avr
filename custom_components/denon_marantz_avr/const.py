@@ -22,6 +22,7 @@ CONF_MANUFACTURER = "manufacturer"
 CONF_SERIAL_NUMBER = "serial_number"
 CONF_UPDATE_AUDYSSEY = "update_audyssey"
 CONF_USE_TELNET = "use_telnet"
+CONF_FOLDER_ART_URL = "folder_art_url"
 
 DEFAULT_SHOW_SOURCES = False
 DEFAULT_TIMEOUT = 5
@@ -29,6 +30,7 @@ DEFAULT_ZONE2 = False
 DEFAULT_ZONE3 = False
 DEFAULT_UPDATE_AUDYSSEY = False
 DEFAULT_USE_TELNET = False
+DEFAULT_FOLDER_ART_URL = ""
 
 # Channel volume constants
 CHANNEL_MAP = {

@@ -26,11 +26,13 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.httpx_client import get_async_client
 
 from .const import (
+    CONF_FOLDER_ART_URL,
     CONF_SHOW_ALL_SOURCES,
     CONF_UPDATE_AUDYSSEY,
     CONF_USE_TELNET,
     CONF_ZONE2,
     CONF_ZONE3,
+    DEFAULT_FOLDER_ART_URL,
     DEFAULT_SHOW_SOURCES,
     DEFAULT_TIMEOUT,
     DEFAULT_UPDATE_AUDYSSEY,
@@ -91,7 +93,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: DenonavrConfigEntry) -> 
 
     # Optional HEOS network-streaming player (best-effort; only when the
     # receiver has HEOS Built-in and a player matching this host is found).
-    heos = HeosStreaming(entry.data[CONF_HOST])
+    heos = HeosStreaming(
+        entry.data[CONF_HOST],
+        entry.options.get(CONF_FOLDER_ART_URL, DEFAULT_FOLDER_ART_URL),
+    )
     if not await heos.async_connect():
         heos = None
 

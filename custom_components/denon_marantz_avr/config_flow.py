@@ -26,6 +26,7 @@ from homeassistant.helpers.service_info.ssdp import (
 )
 
 from .const import (
+    CONF_FOLDER_ART_URL,
     CONF_MANUFACTURER,
     CONF_SERIAL_NUMBER,
     CONF_SHOW_ALL_SOURCES,
@@ -33,6 +34,7 @@ from .const import (
     CONF_USE_TELNET,
     CONF_ZONE2,
     CONF_ZONE3,
+    DEFAULT_FOLDER_ART_URL,
     DEFAULT_SHOW_SOURCES,
     DEFAULT_TIMEOUT,
     DEFAULT_UPDATE_AUDYSSEY,
@@ -94,6 +96,12 @@ class OptionsFlowHandler(OptionsFlowWithReload):
                         CONF_USE_TELNET, DEFAULT_USE_TELNET
                     ),
                 ): bool,
+                vol.Optional(
+                    CONF_FOLDER_ART_URL,
+                    default=self.config_entry.options.get(
+                        CONF_FOLDER_ART_URL, DEFAULT_FOLDER_ART_URL
+                    ),
+                ): str,
             }
         )
 

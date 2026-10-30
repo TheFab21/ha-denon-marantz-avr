@@ -37,11 +37,15 @@
         "step": {
             "init": {
                 "data": {
+                    "folder_art_url": "URL van de mapillustratieservice (optioneel)",
                     "show_all_sources": "Toon alle bronnen",
                     "update_audyssey": "Audyssey-instellingen bijwerken",
                     "use_telnet": "Gebruik Telnet-verbinding",
                     "zone2": "Zone 2 instellen",
                     "zone3": "Zone 3 instellen"
+                },
+                "data_description": {
+                    "folder_art_url": "Optionele HTTP-service die mapillustraties levert voor HEOS/DLNA-mappen die deze niet bieden (bijv. een MiniDLNA-coverlookup). Laat leeg om uit te schakelen."
                 },
                 "description": "Geef optionele instellingen op"
             }

@@ -31,9 +31,12 @@ _LOGGER = logging.getLogger(__name__)
 class HeosStreaming:
     """Manage the optional HEOS connection for a single receiver."""
 
-    def __init__(self, host: str) -> None:
+    def __init__(self, host: str, folder_art_url: str | None = None) -> None:
         """Initialize the HEOS connection wrapper."""
         self._host = host
+        # Optional external service that resolves a folder/container id to its
+        # artwork URL (e.g. a MiniDLNA cover lookup). Empty = disabled.
+        self.folder_art_url = (folder_art_url or "").strip() or None
         self.heos = Heos(
             HeosOptions(
                 host,

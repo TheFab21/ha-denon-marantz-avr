@@ -37,11 +37,15 @@
         "step": {
             "init": {
                 "data": {
+                    "folder_art_url": "URL del servicio de carátulas de carpeta (opcional)",
                     "show_all_sources": "Mostrar todas las fuentes",
                     "update_audyssey": "Actualizar configuración de Audyssey",
                     "use_telnet": "Usar conexión Telnet",
                     "zone2": "Configurar Zona 2",
                     "zone3": "Configurar Zona 3"
+                },
+                "data_description": {
+                    "folder_art_url": "Servicio HTTP opcional que devuelve la carátula de las carpetas HEOS/DLNA que no la proporcionan (p. ej. una búsqueda de carátulas de MiniDLNA). Déjalo vacío para desactivar."
                 },
                 "description": "Especificar configuraciones opcionales"
             }

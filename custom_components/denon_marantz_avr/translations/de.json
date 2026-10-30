@@ -37,11 +37,15 @@
         "step": {
             "init": {
                 "data": {
+                    "folder_art_url": "URL des Ordner-Coverdienstes (optional)",
                     "show_all_sources": "Alle Quellen anzeigen",
                     "update_audyssey": "Audyssey-Einstellungen aktualisieren",
                     "use_telnet": "Telnet-Verbindung verwenden",
                     "zone2": "Zone 2 einrichten",
                     "zone3": "Zone 3 einrichten"
+                },
+                "data_description": {
+                    "folder_art_url": "Optionaler HTTP-Dienst, der Coverbilder für HEOS/DLNA-Ordner liefert, die keine bereitstellen (z. B. eine MiniDLNA-Cover-Suche). Leer lassen zum Deaktivieren."
                 },
                 "description": "Optionale Einstellungen angeben"
             }

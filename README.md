@@ -95,6 +95,12 @@ After setup, open the integration options to configure:
 - **Use Telnet connection** — real-time push updates (enabled by default for new
   installs). Only one Telnet client can be connected to the receiver at a time.
 - **Update Audyssey settings** — also poll Audyssey values with the media player.
+- **Folder artwork service URL** *(optional)* — URL of an external HTTP service
+  that returns cover art for HEOS/DLNA folders that don't provide it. When set,
+  folders browsed over HEOS get artwork from it. Leave empty to disable. A
+  ready-to-run MiniDLNA example (contributed by
+  [@Sven-Tarras](https://github.com/Sven-Tarras)) is in
+  [`contrib/minidlna-cover-art/`](contrib/minidlna-cover-art/).
 
 ## Entities
 

@@ -37,11 +37,15 @@
         "step": {
             "init": {
                 "data": {
+                    "folder_art_url": "Folder artwork service URL (optional)",
                     "show_all_sources": "Show all sources",
                     "update_audyssey": "Update Audyssey settings",
                     "use_telnet": "Use Telnet connection",
                     "zone2": "Set up Zone 2",
                     "zone3": "Set up Zone 3"
+                },
+                "data_description": {
+                    "folder_art_url": "Optional HTTP service that returns folder artwork for HEOS/DLNA folders that don't provide it (e.g. a MiniDLNA cover lookup). Leave empty to disable."
                 },
                 "description": "Specify optional settings"
             }

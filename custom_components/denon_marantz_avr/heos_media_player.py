@@ -13,12 +13,14 @@ see that integration for the full HEOS system experience).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import suppress
 from functools import reduce
 from operator import ior
 from typing import TYPE_CHECKING, Any
 
+import httpx
 from homeassistant.components import media_source
 from homeassistant.components.media_player import (
     ATTR_MEDIA_ENQUEUE,
@@ -35,6 +37,7 @@ from homeassistant.components.media_player import (
 )
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.util.dt import utcnow
 from pyheos import (
     AddCriteriaType,
@@ -69,6 +72,9 @@ BROWSE_ROOT = "heos://media"
 # ignores the requested range.
 _BROWSE_PAGE_SIZE = 100
 _BROWSE_MAX_ITEMS = 5000
+
+# Timeout (seconds) for the optional external folder-artwork lookup.
+_FOLDER_ART_TIMEOUT = 5.0
 
 BASE_SUPPORTED_FEATURES = (
     MediaPlayerEntityFeature.VOLUME_MUTE
@@ -383,12 +389,15 @@ class HeosStreamingPlayer(MediaPlayerEntity):
             media, _data = heos_source.from_media_uri(media_content_id)
             browse_media = _media_to_browse_media(media)
             with suppress(HeosError):
-                items = await self._browse_all_items(media)
-                browse_media.children = [
-                    _media_to_browse_media(item)
-                    for item in items
+                items = [
+                    item
+                    for item in await self._browse_all_items(media)
                     if item.browsable or item.playable
                 ]
+                children = [_media_to_browse_media(item) for item in items]
+                browse_media.children = children
+                if self._streaming.folder_art_url:
+                    await self._fill_folder_art(browse_media, media, children, items)
             return browse_media
         if media_source.is_media_source_id(media_content_id):
             return await self._async_browse_media_source(media_content_id)
@@ -425,6 +434,75 @@ class HeosStreamingPlayer(MediaPlayerEntity):
             items.extend(result.items)
             offset += result.returned
         return items
+
+    async def _fill_folder_art(
+        self,
+        parent: BrowseMedia,
+        parent_media: MediaItem | MediaMusicSource,
+        children: list[BrowseMedia],
+        items: list[MediaItem],
+    ) -> None:
+        """
+        Fill missing container thumbnails from the external cover service.
+
+        Some sources (e.g. MiniDLNA folders) do not return artwork over HEOS
+        even when it exists on the server. When a cover-lookup service URL is
+        configured, resolve the browsed folder's and its child folders'
+        artwork by container id. Lookups run concurrently and fail silently.
+        """
+        targets: list[BrowseMedia] = []
+        container_ids: list[str] = []
+        if (
+            not parent.thumbnail
+            and isinstance(parent_media, MediaItem)
+            and parent_media.type == HeosMediaType.CONTAINER
+            and parent_media.container_id
+        ):
+            targets.append(parent)
+            container_ids.append(parent_media.container_id)
+        for child, item in zip(children, items, strict=True):
+            if (
+                not child.thumbnail
+                and item.type == HeosMediaType.CONTAINER
+                and item.container_id
+            ):
+                targets.append(child)
+                container_ids.append(item.container_id)
+        if not container_ids:
+            return
+        thumbnails = await asyncio.gather(
+            *(self._get_folder_thumbnail(cid) for cid in container_ids)
+        )
+        for target, thumbnail in zip(targets, thumbnails, strict=True):
+            if thumbnail:
+                target.thumbnail = thumbnail
+
+    async def _get_folder_thumbnail(self, container_id: str) -> str | None:
+        """Resolve a folder/container id to an artwork URL (best-effort)."""
+        base_url = self._streaming.folder_art_url
+        if not base_url:
+            return None
+        try:
+            response = await get_async_client(self.hass).get(
+                base_url,
+                params={"container_id": container_id},
+                timeout=_FOLDER_ART_TIMEOUT,
+            )
+            response.raise_for_status()
+            data = response.json()
+        except (httpx.HTTPError, OSError, ValueError) as err:
+            _LOGGER.debug(
+                "Folder-art lookup failed: container_id=%r error=%r",
+                container_id,
+                err,
+            )
+            return None
+        if not isinstance(data, dict):
+            return None
+        thumbnail = data.get("thumbnail")
+        if isinstance(thumbnail, str) and thumbnail:
+            return thumbnail
+        return None
 
     async def _async_browse_root(self) -> BrowseMedia:
         heos = self._streaming.heos
