@@ -47,6 +47,7 @@ from .const import (
     DOMAIN,
 )
 from .heos_media_player import HeosStreamingPlayer
+from .util import sanitize_image_url
 from .webapi import (
     SoundModeSettings,
     async_get_sound_mode_settings,
@@ -437,7 +438,7 @@ class DenonDevice(MediaPlayerEntity):
     def media_image_url(self) -> str | None:
         """Image url of current playing media."""
         if self._receiver.input_func in self._receiver.playing_func_list:
-            return self._receiver.image_url
+            return sanitize_image_url(self._receiver.image_url)
         return None
 
     @property
