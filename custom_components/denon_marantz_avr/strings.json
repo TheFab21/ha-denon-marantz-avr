@@ -121,6 +121,14 @@
       "streaming": {
         "name": "HEOS streaming"
       }
+    },
+    "sensor": {
+      "input_signal": {
+        "name": "Input signal"
+      },
+      "active_speakers": {
+        "name": "Active speakers"
+      }
     }
   },
   "services": {

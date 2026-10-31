@@ -34,6 +34,7 @@ If this project is useful to you, you can support its development:
 | **Real sound-mode list** | On recent receivers (HEOS-era, port 11080) the sound-mode list is read live from the device, so only the modes actually available for the current input are shown — with automatic fallback to the library list on older models |
 | **Sound category** | On recent receivers, a sound-mode category (genre) selector read live from the device — picking a category re-shapes the surround modes on offer (`select`) |
 | **Sound mode** | The active sound mode as a stand-alone dropdown (`select`), in addition to the media player's own control — using the same real, device-reported list |
+| **Input signal & active speakers** | On recent receivers, two `sensor` entities read live from the device: the channels present in the incoming audio (e.g. `FL FR`) and the speakers actually being driven (e.g. `FL FR C SL SR`) — handy to see at a glance whether a source is 2.0, 5.1, Atmos… |
 | **HEOS streaming** | Optional second media player (same device) for HEOS Built-in: now-playing with cover art, transport, favorites & inputs as sources, repeat/shuffle and media browsing — including **playing a whole folder/container** (e.g. a DLNA directory) — via `pyheos`. Created only when the receiver has HEOS; nothing changes on older models |
 | **Multi-zone** | Main Zone plus optional Zone 2 and Zone 3 as separate entities |
 | **Real-time updates** | Telnet push connection (`local_push`) for instant state changes, with HTTP fallback |
@@ -113,6 +114,7 @@ All entities are grouped under a single Home Assistant device per receiver:
   Enhancer, M‑DAX / Audio Restorer, DRC, Bluetooth output, Speaker preset, Sound
   category, Sound mode
 - `button.*` — Refresh Audyssey, Recover audio
+- `sensor.*` — Input signal, Active speakers (recent receivers, via the web API)
 
 > The advanced audio entities (Dialog Enhancer, M‑DAX, DRC, delay, sleep,
 > Bluetooth, Graphic EQ, Speaker preset) are **created only when your receiver

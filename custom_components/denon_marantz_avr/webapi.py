@@ -43,7 +43,70 @@ _LOGGER = logging.getLogger(__name__)
 WEBAPI_PORT = 11080
 _TIMEOUT = 4.0
 _GET_SOUND_MODE_TYPE = 9
+_GET_AUDIO_TYPE = 1
 _SET_TYPE = 4
+
+# Channel index -> label, taken from the receiver's own web app (the
+# ``InputSignal`` and ``ActiveSpeaker`` tables served on port 11080). Both
+# share one index space; ActiveSpeaker covers more speaker positions (heights,
+# tops, wides, ...) than the input-signal display.
+INPUT_SIGNAL_CHANNELS: dict[int, str] = {
+    0: "FL",
+    1: "FR",
+    2: "C",
+    3: "LFE",
+    5: "SL",
+    6: "SR",
+    7: "SBL",
+    8: "SBR",
+    9: "SB",
+    10: "FWL",
+    11: "FWR",
+    12: "FHL",
+    13: "FHR",
+    24: "SHL",
+    25: "SHR",
+    30: "CH",
+    31: "TS",
+    35: "EXT",
+}
+ACTIVE_SPEAKER_CHANNELS: dict[int, str] = {
+    0: "FL",
+    1: "FR",
+    2: "C",
+    3: "SW",
+    5: "SL",
+    6: "SR",
+    7: "SBL",
+    8: "SBR",
+    9: "SB",
+    10: "FWL",
+    11: "FWR",
+    12: "FHL",
+    13: "FHR",
+    14: "FDL",
+    15: "FDR",
+    16: "TFL",
+    17: "TFR",
+    18: "TML",
+    19: "TMR",
+    20: "SDL",
+    21: "SDR",
+    22: "TRL",
+    23: "TRR",
+    24: "SHL",
+    25: "SHR",
+    26: "RHL",
+    27: "RHR",
+    28: "BDL",
+    29: "BDR",
+    30: "CH",
+    31: "TS",
+}
+
+# Per-speaker value: "2" = active (present in the signal / speaker playing),
+# "1" = available but idle, "0" = not present.
+_CHANNEL_ACTIVE = "2"
 
 
 @dataclass(frozen=True)
@@ -160,3 +223,72 @@ async def async_select_sound_mode(
 async def async_select_genre(client: httpx.AsyncClient, host: str, index: int) -> bool:
     """Select a sound category (genre) by its 1-based index."""
     return await _async_set(client, host, f"<Genre>{index}</Genre>", "genre")
+
+
+@dataclass(frozen=True)
+class AudioInfo:
+    """Current audio status (active channels) from the port-11080 web API."""
+
+    input_signal: list[str]
+    active_speakers: list[str]
+
+    @property
+    def input_signal_text(self) -> str | None:
+        """Return the input-signal channels as text, or None when empty."""
+        return " ".join(self.input_signal) or None
+
+    @property
+    def active_speakers_text(self) -> str | None:
+        """Return the active-speaker channels as text, or None when empty."""
+        return " ".join(self.active_speakers) or None
+
+
+def _active_channels(parent: ET.Element | None, names: dict[int, str]) -> list[str]:
+    """Return the labels of the active (value "2") speakers in a section."""
+    channels: list[str] = []
+    if parent is None:
+        return channels
+    for item in parent.findall("./List/Speaker"):
+        index_attr = item.get("index")
+        if (
+            index_attr
+            and index_attr.isdigit()
+            and (item.text or "").strip() == _CHANNEL_ACTIVE
+        ):
+            name = names.get(int(index_attr))
+            if name:
+                channels.append(name)
+    return channels
+
+
+def _parse_audio(text: str) -> AudioInfo | None:
+    """Parse an audio get_config?type=1 XML body."""
+    try:
+        root = ET.fromstring(text)  # noqa: S314 - trusted local device
+    except ET.ParseError:
+        return None
+    if root.tag != "Audio":
+        return None
+    return AudioInfo(
+        input_signal=_active_channels(root.find("InputSignal"), INPUT_SIGNAL_CHANNELS),
+        active_speakers=_active_channels(
+            root.find("ActiveSpeaker"), ACTIVE_SPEAKER_CHANNELS
+        ),
+    )
+
+
+async def async_get_audio_info(
+    client: httpx.AsyncClient, host: str
+) -> AudioInfo | None:
+    """Fetch the active input-signal / speaker channels, or None if absent."""
+    try:
+        response = await client.get(
+            f"http://{host}:{WEBAPI_PORT}/ajax/audio/get_config",
+            params={"type": _GET_AUDIO_TYPE},
+            timeout=_TIMEOUT,
+        )
+        response.raise_for_status()
+    except (httpx.HTTPError, OSError) as err:
+        _LOGGER.debug("Web API audio read failed for %s: %s", host, err)
+        return None
+    return _parse_audio(response.text)
