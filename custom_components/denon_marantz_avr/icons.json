@@ -71,6 +71,18 @@
       },
       "active_speakers": {
         "default": "mdi:speaker-multiple"
+      },
+      "audio_format": {
+        "default": "mdi:file-music"
+      },
+      "decoded_mode": {
+        "default": "mdi:waveform"
+      },
+      "video_signal": {
+        "default": "mdi:video-input-hdmi"
+      },
+      "hdr": {
+        "default": "mdi:hdr"
       }
     }
   },

@@ -44,7 +44,12 @@ WEBAPI_PORT = 11080
 _TIMEOUT = 4.0
 _GET_SOUND_MODE_TYPE = 9
 _GET_AUDIO_TYPE = 1
+_GET_INFORMATION_TYPE = 1
+_GET_VIDEO_TYPE = 3
 _SET_TYPE = 4
+
+# Placeholder the receiver uses for "no value" in the info endpoints.
+_NO_VALUE = "---"
 
 # Channel index -> label, taken from the receiver's own web app (the
 # ``InputSignal`` and ``ActiveSpeaker`` tables served on port 11080). Both
@@ -292,3 +297,145 @@ async def async_get_audio_info(
         _LOGGER.debug("Web API audio read failed for %s: %s", host, err)
         return None
     return _parse_audio(response.text)
+
+
+def _clean(value: str | None) -> str | None:
+    """Return a stripped value, or None when empty or the "---" placeholder."""
+    if value is None:
+        return None
+    text = value.strip()
+    if not text or text == _NO_VALUE:
+        return None
+    return text
+
+
+def _child_text(parent: ET.Element, tag: str) -> str | None:
+    """Return the cleaned text of a direct child element, if present."""
+    child = parent.find(tag)
+    return _clean(child.text) if child is not None else None
+
+
+@dataclass(frozen=True)
+class Information:
+    """The receiver's current source / signal / decoding (info type 1)."""
+
+    source: str | None
+    signal: str | None
+    sound: str | None
+
+
+def _parse_information(text: str) -> Information | None:
+    """Parse an info get_config?type=1 XML body."""
+    try:
+        root = ET.fromstring(text)  # noqa: S314 - trusted local device
+    except ET.ParseError:
+        return None
+    if root.tag != "Information":
+        return None
+    return Information(
+        source=_child_text(root, "Source"),
+        signal=_child_text(root, "Signal"),
+        sound=_child_text(root, "Sound"),
+    )
+
+
+async def async_get_information(
+    client: httpx.AsyncClient, host: str
+) -> Information | None:
+    """Fetch the current source / signal / decoding, or None if absent."""
+    try:
+        response = await client.get(
+            f"http://{host}:{WEBAPI_PORT}/ajax/info/get_config",
+            params={"type": _GET_INFORMATION_TYPE},
+            timeout=_TIMEOUT,
+        )
+        response.raise_for_status()
+    except (httpx.HTTPError, OSError) as err:
+        _LOGGER.debug("Web API information read failed for %s: %s", host, err)
+        return None
+    return _parse_information(response.text)
+
+
+@dataclass(frozen=True)
+class VideoInfo:
+    """The receiver's current HDMI video status (info type 3)."""
+
+    resolution_in: str | None
+    resolution_out: str | None
+    hdr_in: str | None
+    hdr_out: str | None
+    color_space_in: str | None
+    color_space_out: str | None
+    colorimetry_in: str | None
+    colorimetry_out: str | None
+    pixel_depth_in: str | None
+    pixel_depth_out: str | None
+
+    @property
+    def attributes(self) -> dict[str, str]:
+        """Return the populated video fields as a flat attribute mapping."""
+        fields = {
+            "resolution_in": self.resolution_in,
+            "resolution_out": self.resolution_out,
+            "hdr_in": self.hdr_in,
+            "hdr_out": self.hdr_out,
+            "color_space_in": self.color_space_in,
+            "color_space_out": self.color_space_out,
+            "colorimetry_in": self.colorimetry_in,
+            "colorimetry_out": self.colorimetry_out,
+            "pixel_depth_in": self.pixel_depth_in,
+            "pixel_depth_out": self.pixel_depth_out,
+        }
+        return {key: value for key, value in fields.items() if value is not None}
+
+
+def _in_out(root: ET.Element, tag: str) -> tuple[str | None, str | None]:
+    """Return the (Input, Output) cleaned text pair under ``tag``."""
+    section = root.find(tag)
+    if section is None:
+        return None, None
+    return _child_text(section, "Input"), _child_text(section, "Output")
+
+
+def _parse_video(text: str) -> VideoInfo | None:
+    """Parse an info get_config?type=3 XML body."""
+    try:
+        root = ET.fromstring(text)  # noqa: S314 - trusted local device
+    except ET.ParseError:
+        return None
+    if root.tag != "Video":
+        return None
+    resolution_in, resolution_out = _in_out(root, "Resolution")
+    hdr_in, hdr_out = _in_out(root, "HDR")
+    color_space_in, color_space_out = _in_out(root, "ColorSpace")
+    colorimetry_in, colorimetry_out = _in_out(root, "Colorimetry")
+    pixel_depth_in, pixel_depth_out = _in_out(root, "PixelDepth")
+    return VideoInfo(
+        resolution_in=resolution_in,
+        resolution_out=resolution_out,
+        hdr_in=hdr_in,
+        hdr_out=hdr_out,
+        color_space_in=color_space_in,
+        color_space_out=color_space_out,
+        colorimetry_in=colorimetry_in,
+        colorimetry_out=colorimetry_out,
+        pixel_depth_in=pixel_depth_in,
+        pixel_depth_out=pixel_depth_out,
+    )
+
+
+async def async_get_video_info(
+    client: httpx.AsyncClient, host: str
+) -> VideoInfo | None:
+    """Fetch the current HDMI video status, or None if absent."""
+    try:
+        response = await client.get(
+            f"http://{host}:{WEBAPI_PORT}/ajax/info/get_config",
+            params={"type": _GET_VIDEO_TYPE},
+            timeout=_TIMEOUT,
+        )
+        response.raise_for_status()
+    except (httpx.HTTPError, OSError) as err:
+        _LOGGER.debug("Web API video read failed for %s: %s", host, err)
+        return None
+    return _parse_video(response.text)
