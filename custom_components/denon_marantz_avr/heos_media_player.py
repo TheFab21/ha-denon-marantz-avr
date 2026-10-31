@@ -57,6 +57,7 @@ from pyheos import (
 from pyheos.util import mediauri as heos_source
 
 from .const import DOMAIN
+from .util import sanitize_image_url
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -247,7 +248,7 @@ class HeosStreamingPlayer(MediaPlayerEntity):
     @property
     def media_image_url(self) -> str | None:
         """Return the current cover-art URL."""
-        return self._player.now_playing_media.image_url or None
+        return sanitize_image_url(self._player.now_playing_media.image_url)
 
     @property
     def media_duration(self) -> int | None:
