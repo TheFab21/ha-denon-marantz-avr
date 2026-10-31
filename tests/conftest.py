@@ -49,6 +49,7 @@ class _Platform:
     NUMBER = "number"
     BUTTON = "button"
     SELECT = "select"
+    SENSOR = "sensor"
     SWITCH = "switch"
 
 
