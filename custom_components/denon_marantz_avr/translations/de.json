@@ -128,6 +128,18 @@
             },
             "active_speakers": {
                 "name": "Aktive Lautsprecher"
+            },
+            "audio_format": {
+                "name": "Audioformat"
+            },
+            "decoded_mode": {
+                "name": "Dekodiermodus"
+            },
+            "video_signal": {
+                "name": "Videosignal"
+            },
+            "hdr": {
+                "name": "HDR"
             }
         }
     },

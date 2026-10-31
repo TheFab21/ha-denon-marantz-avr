@@ -29,7 +29,9 @@ from .const import (
 )
 from .webapi import (
     async_get_audio_info,
+    async_get_information,
     async_get_sound_mode_settings,
+    async_get_video_info,
     async_select_genre,
     async_select_sound_mode,
 )
@@ -40,7 +42,7 @@ if TYPE_CHECKING:
     from denonavr import DenonAVR
     from homeassistant.core import HomeAssistant
 
-    from .webapi import AudioInfo, SoundModeSettings
+    from .webapi import AudioInfo, Information, SoundModeSettings, VideoInfo
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -68,11 +70,15 @@ class DenonControlsCoordinator(DataUpdateCoordinator[None]):
         self.sound_modes: SoundModeSettings | None = None
         # Active input-signal / speaker channels from the same web API.
         self.audio_info: AudioInfo | None = None
+        # Current source / audio format / decoding (info type 1).
+        self.information: Information | None = None
+        # Current HDMI video status (info type 3).
+        self.video_info: VideoInfo | None = None
         self.web_available = False
         self._web_probed = False
 
     async def _async_update_web(self) -> None:
-        """Refresh the web-API sound-mode and audio status (best-effort)."""
+        """Refresh the web-API sound-mode and audio/video status (best-effort)."""
         if self._web_probed and not self.web_available:
             return
         client = get_async_client(self.hass)
@@ -84,7 +90,11 @@ class DenonControlsCoordinator(DataUpdateCoordinator[None]):
         elif not self._web_probed:
             self.web_available = False
         if self.web_available:
-            self.audio_info = await async_get_audio_info(client, host)
+            self.audio_info, self.information, self.video_info = await asyncio.gather(
+                async_get_audio_info(client, host),
+                async_get_information(client, host),
+                async_get_video_info(client, host),
+            )
         self._web_probed = True
 
     async def async_set_sound_category(self, index: int) -> None:
