@@ -28,6 +28,7 @@ from .const import (
     DOMAIN,
 )
 from .webapi import (
+    async_get_audio_info,
     async_get_sound_mode_settings,
     async_select_genre,
     async_select_sound_mode,
@@ -39,7 +40,7 @@ if TYPE_CHECKING:
     from denonavr import DenonAVR
     from homeassistant.core import HomeAssistant
 
-    from .webapi import SoundModeSettings
+    from .webapi import AudioInfo, SoundModeSettings
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -65,21 +66,25 @@ class DenonControlsCoordinator(DataUpdateCoordinator[None]):
         self.command_lock = asyncio.Lock()
         # Real sound-mode list / current category from the port-11080 web API.
         self.sound_modes: SoundModeSettings | None = None
+        # Active input-signal / speaker channels from the same web API.
+        self.audio_info: AudioInfo | None = None
         self.web_available = False
         self._web_probed = False
 
     async def _async_update_web(self) -> None:
-        """Refresh the web-API sound-mode settings (best-effort)."""
+        """Refresh the web-API sound-mode and audio status (best-effort)."""
         if self._web_probed and not self.web_available:
             return
-        settings = await async_get_sound_mode_settings(
-            get_async_client(self.hass), self.receiver.host
-        )
+        client = get_async_client(self.hass)
+        host = self.receiver.host
+        settings = await async_get_sound_mode_settings(client, host)
         if settings is not None:
             self.web_available = True
             self.sound_modes = settings
         elif not self._web_probed:
             self.web_available = False
+        if self.web_available:
+            self.audio_info = await async_get_audio_info(client, host)
         self._web_probed = True
 
     async def async_set_sound_category(self, index: int) -> None:

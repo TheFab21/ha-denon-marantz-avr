@@ -64,6 +64,14 @@
       "recover_audio": {
         "default": "mdi:restart"
       }
+    },
+    "sensor": {
+      "input_signal": {
+        "default": "mdi:surround-sound"
+      },
+      "active_speakers": {
+        "default": "mdi:speaker-multiple"
+      }
     }
   },
   "services": {
