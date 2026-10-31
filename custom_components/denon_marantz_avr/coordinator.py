@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 from denonavr.const import ALL_TELNET_EVENTS
 from denonavr.exceptions import DenonAvrError
 from homeassistant.core import callback
+from homeassistant.helpers.debounce import Debouncer
 from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -46,6 +47,11 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+# The receiver pushes Telnet events in bursts (a batch of property updates
+# every few seconds). Coalesce a burst into a single entity refresh instead
+# of refreshing once per event.
+_TELNET_DEBOUNCE_SECONDS = 0.5
+
 
 class DenonControlsCoordinator(DataUpdateCoordinator[None]):
     """Coordinate receiver control updates and serialize commands."""
@@ -66,6 +72,14 @@ class DenonControlsCoordinator(DataUpdateCoordinator[None]):
         self.receiver = receiver
         self.device_id = device_id
         self.command_lock = asyncio.Lock()
+        # Coalesce bursts of Telnet events into a single entity refresh.
+        self._telnet_debouncer = Debouncer(
+            hass,
+            _LOGGER,
+            cooldown=_TELNET_DEBOUNCE_SECONDS,
+            immediate=True,
+            function=self._async_push_telnet_update,
+        )
         # Real sound-mode list / current category from the port-11080 web API.
         self.sound_modes: SoundModeSettings | None = None
         # Active input-signal / speaker channels from the same web API.
@@ -109,6 +123,10 @@ class DenonControlsCoordinator(DataUpdateCoordinator[None]):
         )
         await self.async_request_refresh()
 
+    async def _async_push_telnet_update(self) -> None:
+        """Refresh the control entities with the latest Telnet-pushed state."""
+        self.async_set_updated_data(None)
+
     @callback
     def async_register_telnet_listener(self) -> Callable[[], None]:
         """
@@ -117,17 +135,19 @@ class DenonControlsCoordinator(DataUpdateCoordinator[None]):
         Many of the receiver's extra settings (Dialog Enhancer, M-DAX, audio
         delay, Bluetooth transmitter, ...) are only pushed over Telnet. The
         30 s poll already reads their current value, but registering for
-        Telnet events lets the controls update immediately. Returns a
-        callback that unregisters the listener.
+        Telnet events lets the controls update immediately. The receiver
+        pushes events in bursts, so refreshes are debounced to one per burst.
+        Returns a callback that unregisters the listener.
         """
 
         def _telnet_callback(zone: str, event: str, parameter: str) -> None:  # noqa: ARG001
-            self.async_set_updated_data(None)
+            self.hass.async_create_task(self._telnet_debouncer.async_call())
 
         self.receiver.register_callback(ALL_TELNET_EVENTS, _telnet_callback)
 
         def _unregister() -> None:
             self.receiver.unregister_callback(ALL_TELNET_EVENTS, _telnet_callback)
+            self._telnet_debouncer.async_cancel()
 
         return _unregister
 
