@@ -45,6 +45,7 @@ If this project is useful to you, you can support its development:
 | **Audyssey** | Dynamic EQ (`switch`), Dynamic Volume / Reference Level Offset / MultiEQ (`select`) |
 | **Eco mode** | Off / Auto / On (`select`) |
 | **Advanced audio** | Dialog Enhancer, M‑DAX / Audio Restorer, DRC, Bluetooth output, Speaker preset (`select`); Bluetooth transmitter, Graphic EQ (`switch`); audio delay, sleep timer (`number`) — capability-detected, Telnet only |
+| **Smart/Quick Select** | Recall a Smart Select (Marantz) / Quick Select (Denon) preset — source, volume, sound mode and more in one step (`select`) |
 | **Buttons** | Refresh Audyssey, Recover audio (soft power-cycle that restores the previous input) |
 | **Services** | `get_command`, `set_dynamic_eq`, `update_audyssey` |
 
@@ -113,7 +114,7 @@ All entities are grouped under a single Home Assistant device per receiver:
 - `switch.*` — Dynamic EQ, Bluetooth transmitter, Graphic EQ
 - `select.*` — Dynamic Volume, Reference Level Offset, MultiEQ, Eco mode, Dialog
   Enhancer, M‑DAX / Audio Restorer, DRC, Bluetooth output, Speaker preset, Sound
-  category, Sound mode
+  category, Sound mode, Smart/Quick Select
 - `button.*` — Refresh Audyssey, Recover audio
 - `sensor.*` — Input signal, Active speakers, Audio format, Decoded mode, Video
   signal, HDR, ALLM, QFT, Dirac Live (recent receivers, via the web API)
@@ -171,6 +172,9 @@ shared by every platform:
 The *Recover audio* button performs a **soft** power cycle (standby off/on) and
 restores the previously selected input. It never cuts electrical power; do not
 use it while the receiver is updating its firmware.
+
+See [`docs/ports.md`](docs/ports.md) for the network ports the integration uses
+(handy for firewall rules).
 
 ## Development
 

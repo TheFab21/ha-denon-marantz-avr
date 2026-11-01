@@ -47,6 +47,12 @@
       },
       "sound_mode": {
         "default": "mdi:audio-video"
+      },
+      "smart_select": {
+        "default": "mdi:star-box-multiple"
+      },
+      "quick_select": {
+        "default": "mdi:star-box-multiple"
       }
     },
     "number": {
