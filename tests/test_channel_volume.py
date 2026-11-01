@@ -463,3 +463,46 @@ class TestInitialQuery:
         assert manager.channel_volumes["FL"] == 0.0
         assert manager.channel_volumes["FR"] == 3.5
         assert manager.channel_volumes["C"] == -2.0
+
+
+class TestLayoutRequery:
+    """Levels are re-asked when the sound mode / speaker preset changes."""
+
+    def test_sound_mode_change_schedules_one_requery(self, manager):
+        manager._layout_callback("Main", "MS", "STEREO")
+        manager._layout_callback("Main", "MS", "DTS NEURAL:X")
+        assert manager.hass.loop.call_later.call_count == 2
+
+    def test_repeated_same_value_is_ignored(self, manager):
+        manager._layout_callback("Main", "MS", "DTS NEURAL:X")
+        manager._layout_callback("Main", "MS", "DTS NEURAL:X")
+        assert manager.hass.loop.call_later.call_count == 1
+
+    def test_pending_requery_is_coalesced(self, manager):
+        manager._layout_callback("Main", "MS", "STEREO")
+        first = manager._requery_handle
+        manager._layout_callback("Main", "SP", "PR 2")
+        first.cancel.assert_called_once()
+
+    def test_other_zone_sound_mode_ignored(self, manager_zone2):
+        manager_zone2._layout_callback("Main", "MS", "STEREO")
+        manager_zone2.hass.loop.call_later.assert_not_called()
+
+    async def test_requery_sends_cv_query_over_telnet(self, manager, mock_receiver):
+        mock_receiver.async_send_telnet_commands = AsyncMock()
+        with patch("asyncio.open_connection", new=AsyncMock()) as opened:
+            await manager._async_requery_levels()
+        mock_receiver.async_send_telnet_commands.assert_awaited_once_with("CV?")
+        opened.assert_not_called()
+
+    async def test_no_requery_without_telnet(self, manager, mock_receiver):
+        mock_receiver.async_send_telnet_commands = AsyncMock()
+        mock_receiver.telnet_healthy = False
+        await manager._async_requery_levels()
+        mock_receiver.async_send_telnet_commands.assert_not_awaited()
+
+    def test_power_on_schedules_requery(self, manager, mock_receiver):
+        manager._last_power_state = "STANDBY"
+        mock_receiver.power = "ON"
+        manager._power_callback("Main", "ZM", "ON")
+        manager.hass.loop.call_later.assert_called_once()
