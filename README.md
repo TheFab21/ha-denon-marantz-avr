@@ -116,7 +116,7 @@ All entities are grouped under a single Home Assistant device per receiver:
   category, Sound mode
 - `button.*` — Refresh Audyssey, Recover audio
 - `sensor.*` — Input signal, Active speakers, Audio format, Decoded mode, Video
-  signal, HDR (recent receivers, via the web API)
+  signal, HDR, ALLM, QFT, Dirac Live (recent receivers, via the web API)
 
 > The advanced audio entities (Dialog Enhancer, M‑DAX, DRC, delay, sleep,
 > Bluetooth, Graphic EQ, Speaker preset) are **created only when your receiver

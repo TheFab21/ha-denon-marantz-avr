@@ -140,6 +140,15 @@
             },
             "hdr": {
                 "name": "HDR"
+            },
+            "allm": {
+                "name": "ALLM"
+            },
+            "qft": {
+                "name": "QFT"
+            },
+            "dirac_live": {
+                "name": "Dirac Live"
             }
         }
     },

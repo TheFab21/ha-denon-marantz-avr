@@ -29,12 +29,15 @@ async def async_setup_entry(
     if coordinator.audio_info is not None:
         entities.append(InputSignalSensor(coordinator))
         entities.append(ActiveSpeakersSensor(coordinator))
+        entities.append(DiracSensor(coordinator))
     if coordinator.information is not None:
         entities.append(AudioFormatSensor(coordinator))
         entities.append(DecodedModeSensor(coordinator))
     if coordinator.video_info is not None:
         entities.append(VideoSignalSensor(coordinator))
         entities.append(HdrSensor(coordinator))
+        entities.append(AllmSensor(coordinator))
+        entities.append(QftSensor(coordinator))
     async_add_entities(entities)
 
 
@@ -150,3 +153,58 @@ class HdrSensor(DenonControlsEntity, SensorEntity):
         """Return the output HDR format."""
         video = self.coordinator.video_info
         return video.hdr_out if video is not None else None
+
+
+def _on_off(*, value: bool | None) -> str | None:
+    """Map an optional boolean to an "On"/"Off" string."""
+    if value is None:
+        return None
+    return "On" if value else "Off"
+
+
+class AllmSensor(DenonControlsEntity, SensorEntity):
+    """Auto Low Latency Mode (HDMI 2.1 gaming) on the HDMI output."""
+
+    _attr_translation_key = "allm"
+
+    def __init__(self, coordinator: DenonControlsCoordinator) -> None:
+        """Initialize the ALLM sensor."""
+        super().__init__(coordinator, "allm")
+
+    @property
+    def native_value(self) -> str | None:
+        """Return whether ALLM is on."""
+        video = self.coordinator.video_info
+        return _on_off(value=video.allm) if video is not None else None
+
+
+class QftSensor(DenonControlsEntity, SensorEntity):
+    """Quick Frame Transport (HDMI 2.1 gaming) on the HDMI output."""
+
+    _attr_translation_key = "qft"
+
+    def __init__(self, coordinator: DenonControlsCoordinator) -> None:
+        """Initialize the QFT sensor."""
+        super().__init__(coordinator, "qft")
+
+    @property
+    def native_value(self) -> str | None:
+        """Return whether QFT is on."""
+        video = self.coordinator.video_info
+        return _on_off(value=video.qft) if video is not None else None
+
+
+class DiracSensor(DenonControlsEntity, SensorEntity):
+    """Dirac Live room correction state (filter name when active, else Off)."""
+
+    _attr_translation_key = "dirac_live"
+
+    def __init__(self, coordinator: DenonControlsCoordinator) -> None:
+        """Initialize the Dirac Live sensor."""
+        super().__init__(coordinator, "dirac_live")
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the Dirac Live state."""
+        audio = self.coordinator.audio_info
+        return audio.dirac_state if audio is not None else None
