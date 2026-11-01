@@ -98,3 +98,40 @@ class TestParseVideo:
 
     def test_wrong_root_returns_none(self) -> None:
         assert _parse_video("<Audio/>") is None
+
+
+SAMPLE_AUDIO_DIRAC = (
+    "<Audio><InputSignal><List></List></InputSignal>"
+    "<ActiveSpeaker><List></List></ActiveSpeaker>"
+    '<DiracLive display="3"><Name>Movie</Name></DiracLive></Audio>'
+)
+
+
+class TestDiracAndGaming:
+    def test_dirac_inactive_when_display_not_3(self) -> None:
+        # SAMPLE_AUDIO has <DiracLive display="1"/> -> inactive.
+        audio = _parse_audio(
+            SAMPLE_AUDIO.replace("</Audio>", '<DiracLive display="1"/></Audio>')
+        )
+        assert audio is not None
+        assert audio.dirac_active is False
+        assert audio.dirac_state == "Off"
+
+    def test_dirac_active_shows_filter_name(self) -> None:
+        audio = _parse_audio(SAMPLE_AUDIO_DIRAC)
+        assert audio is not None
+        assert audio.dirac_active is True
+        assert audio.dirac_state == "Movie"
+
+    def test_allm_qft_off_when_not_one(self) -> None:
+        # SAMPLE_VIDEO has ALLM=2 / QFT=2 -> off.
+        video = _parse_video(SAMPLE_VIDEO)
+        assert video is not None
+        assert video.allm is False
+        assert video.qft is False
+
+    def test_allm_on_when_one(self) -> None:
+        video = _parse_video("<Video><ALLM>1</ALLM><QFT>0</QFT></Video>")
+        assert video is not None
+        assert video.allm is True
+        assert video.qft is False

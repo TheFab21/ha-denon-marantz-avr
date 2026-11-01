@@ -83,6 +83,15 @@
       },
       "hdr": {
         "default": "mdi:hdr"
+      },
+      "allm": {
+        "default": "mdi:motion-play"
+      },
+      "qft": {
+        "default": "mdi:fast-forward"
+      },
+      "dirac_live": {
+        "default": "mdi:equalizer"
       }
     }
   },

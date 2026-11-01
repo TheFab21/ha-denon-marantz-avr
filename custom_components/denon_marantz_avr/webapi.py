@@ -113,6 +113,12 @@ ACTIVE_SPEAKER_CHANNELS: dict[int, str] = {
 # "1" = available but idle, "0" = not present.
 _CHANNEL_ACTIVE = "2"
 
+# A "display" attribute of "3" means the receiver shows that item as active
+# (e.g. Audyssey vs Dirac Live room correction). An ALLM/QFT value of "1"
+# means the feature is on.
+_DISPLAY_ACTIVE = "3"
+_FEATURE_ON = "1"
+
 
 @dataclass(frozen=True)
 class SoundModeItem:
@@ -236,6 +242,8 @@ class AudioInfo:
 
     input_signal: list[str]
     active_speakers: list[str]
+    dirac_active: bool = False
+    dirac_name: str | None = None
 
     @property
     def input_signal_text(self) -> str | None:
@@ -246,6 +254,13 @@ class AudioInfo:
     def active_speakers_text(self) -> str | None:
         """Return the active-speaker channels as text, or None when empty."""
         return " ".join(self.active_speakers) or None
+
+    @property
+    def dirac_state(self) -> str:
+        """Return the Dirac Live state: its filter name, "On" or "Off"."""
+        if not self.dirac_active:
+            return "Off"
+        return self.dirac_name or "On"
 
 
 def _active_channels(parent: ET.Element | None, names: dict[int, str]) -> list[str]:
@@ -274,11 +289,16 @@ def _parse_audio(text: str) -> AudioInfo | None:
         return None
     if root.tag != "Audio":
         return None
+    dirac = root.find("DiracLive")
+    dirac_active = dirac is not None and dirac.get("display") == _DISPLAY_ACTIVE
+    dirac_name = _child_text(dirac, "Name") if dirac is not None else None
     return AudioInfo(
         input_signal=_active_channels(root.find("InputSignal"), INPUT_SIGNAL_CHANNELS),
         active_speakers=_active_channels(
             root.find("ActiveSpeaker"), ACTIVE_SPEAKER_CHANNELS
         ),
+        dirac_active=dirac_active,
+        dirac_name=dirac_name,
     )
 
 
@@ -370,6 +390,8 @@ class VideoInfo:
     colorimetry_out: str | None
     pixel_depth_in: str | None
     pixel_depth_out: str | None
+    allm: bool | None = None
+    qft: bool | None = None
 
     @property
     def attributes(self) -> dict[str, str]:
@@ -410,6 +432,8 @@ def _parse_video(text: str) -> VideoInfo | None:
     color_space_in, color_space_out = _in_out(root, "ColorSpace")
     colorimetry_in, colorimetry_out = _in_out(root, "Colorimetry")
     pixel_depth_in, pixel_depth_out = _in_out(root, "PixelDepth")
+    allm_raw = _child_text(root, "ALLM")
+    qft_raw = _child_text(root, "QFT")
     return VideoInfo(
         resolution_in=resolution_in,
         resolution_out=resolution_out,
@@ -421,6 +445,8 @@ def _parse_video(text: str) -> VideoInfo | None:
         colorimetry_out=colorimetry_out,
         pixel_depth_in=pixel_depth_in,
         pixel_depth_out=pixel_depth_out,
+        allm=None if allm_raw is None else allm_raw == _FEATURE_ON,
+        qft=None if qft_raw is None else qft_raw == _FEATURE_ON,
     )
 
 
