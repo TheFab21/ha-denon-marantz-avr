@@ -382,83 +382,84 @@ class TestChannelVolumeNumberProperties:
 
 
 class TestSendCvCommand:
-    async def test_counter_incremented_on_success(self, manager):
-        mock_writer = MagicMock()
-        mock_writer.write = MagicMock()
-        mock_writer.drain = AsyncMock()
-        mock_writer.close = MagicMock()
-        mock_writer.wait_closed = AsyncMock()
+    """CV commands go through the library's telnet link, never a 2nd socket."""
 
-        with patch(
-            "asyncio.open_connection",
-            new=AsyncMock(return_value=(MagicMock(), mock_writer)),
-        ):
-            await manager.async_send_cv_command("FL", 3.0)
+    @staticmethod
+    def _wire(receiver):
+        receiver.async_send_telnet_commands = AsyncMock()
+        receiver.async_get_command = AsyncMock()
 
+    async def test_counter_incremented_on_success(self, manager, mock_receiver):
+        self._wire(mock_receiver)
+        await manager.async_send_cv_command("FL", 3.0)
         assert manager.pending_counters["FL"] == 1
 
-    async def test_main_zone_command_format(self, manager):
-        mock_writer = MagicMock()
-        mock_writer.write = MagicMock()
-        mock_writer.drain = AsyncMock()
-        mock_writer.close = MagicMock()
-        mock_writer.wait_closed = AsyncMock()
+    async def test_main_zone_command_format(self, manager, mock_receiver):
+        self._wire(mock_receiver)
+        await manager.async_send_cv_command("FL", 3.0)
+        mock_receiver.async_send_telnet_commands.assert_awaited_once_with("CVFL 53")
 
-        with patch(
-            "asyncio.open_connection",
-            new=AsyncMock(return_value=(MagicMock(), mock_writer)),
-        ):
+    async def test_zone2_command_format(self, manager_zone2, mock_receiver):
+        self._wire(mock_receiver)
+        await manager_zone2.async_send_cv_command("FL", 3.0)
+        mock_receiver.async_send_telnet_commands.assert_awaited_once_with("Z2CVFL 53")
+
+    async def test_half_db_command_format(self, manager, mock_receiver):
+        self._wire(mock_receiver)
+        await manager.async_send_cv_command("FL", 3.5)
+        mock_receiver.async_send_telnet_commands.assert_awaited_once_with("CVFL 535")
+
+    async def test_never_opens_a_second_telnet_connection(self, manager, mock_receiver):
+        self._wire(mock_receiver)
+        with patch("asyncio.open_connection", new=AsyncMock()) as opened:
             await manager.async_send_cv_command("FL", 3.0)
+        opened.assert_not_called()
 
-        mock_writer.write.assert_called_once_with(b"CVFL 53\r")
-
-    async def test_zone2_command_format(self, manager_zone2):
-        mock_writer = MagicMock()
-        mock_writer.write = MagicMock()
-        mock_writer.drain = AsyncMock()
-        mock_writer.close = MagicMock()
-        mock_writer.wait_closed = AsyncMock()
-
-        with patch(
-            "asyncio.open_connection",
-            new=AsyncMock(return_value=(MagicMock(), mock_writer)),
-        ):
-            await manager_zone2.async_send_cv_command("FL", 3.0)
-
-        mock_writer.write.assert_called_once_with(b"Z2CVFL 53\r")
-
-    async def test_half_db_command_format(self, manager):
-        mock_writer = MagicMock()
-        mock_writer.write = MagicMock()
-        mock_writer.drain = AsyncMock()
-        mock_writer.close = MagicMock()
-        mock_writer.wait_closed = AsyncMock()
-
-        with patch(
-            "asyncio.open_connection",
-            new=AsyncMock(return_value=(MagicMock(), mock_writer)),
-        ):
-            await manager.async_send_cv_command("FL", 3.5)
-
-        mock_writer.write.assert_called_once_with(b"CVFL 535\r")
-
-    async def test_counter_decremented_on_os_error(self, manager):
-        with patch(
-            "asyncio.open_connection",
-            new=AsyncMock(side_effect=OSError("connection refused")),
-        ):
-            await manager.async_send_cv_command("FL", 3.0)
-
+    async def test_http_fallback_when_telnet_down(self, manager, mock_receiver):
+        self._wire(mock_receiver)
+        mock_receiver.telnet_healthy = False
+        await manager.async_send_cv_command("FL", 3.0)
+        mock_receiver.async_send_telnet_commands.assert_not_awaited()
+        mock_receiver.async_get_command.assert_awaited_once_with(
+            "/goform/formiPhoneAppDirect.xml?CVFL%2053"
+        )
+        # No telnet echo is expected, so nothing is pending.
         assert manager.pending_counters["FL"] == 0
 
-    async def test_counter_decremented_on_timeout(self, manager):
-        async def timing_out(*_args, **_kwargs):
-            raise TimeoutError
-
-        with patch(
-            "asyncio.wait_for",
-            side_effect=TimeoutError,
-        ):
-            await manager.async_send_cv_command("FL", 3.0)
-
+    async def test_counter_decremented_on_os_error(self, manager, mock_receiver):
+        self._wire(mock_receiver)
+        mock_receiver.async_send_telnet_commands.side_effect = OSError("down")
+        await manager.async_send_cv_command("FL", 3.0)
         assert manager.pending_counters["FL"] == 0
+
+    async def test_counter_decremented_on_timeout(self, manager, mock_receiver):
+        self._wire(mock_receiver)
+        mock_receiver.async_send_telnet_commands.side_effect = TimeoutError
+        await manager.async_send_cv_command("FL", 3.0)
+        assert manager.pending_counters["FL"] == 0
+
+
+class TestInitialQuery:
+    async def test_query_goes_through_library_telnet(self, manager, mock_receiver):
+        mock_receiver.async_send_telnet_commands = AsyncMock()
+        with patch("asyncio.open_connection", new=AsyncMock()) as opened:
+            await manager._query_initial_values()
+        mock_receiver.async_send_telnet_commands.assert_awaited_once_with("CV?")
+        opened.assert_not_called()
+
+    async def test_short_lived_connection_is_closed(self, manager, mock_receiver):
+        mock_receiver.telnet_connected = False
+        reader = MagicMock()
+        reader.read = AsyncMock(return_value=b"CVFL 50\rCVFR 535\rCVC 48\r")
+        writer = MagicMock()
+        writer.drain = AsyncMock()
+        writer.wait_closed = AsyncMock()
+        with patch(
+            "asyncio.open_connection", new=AsyncMock(return_value=(reader, writer))
+        ):
+            await manager._query_initial_values()
+        writer.write.assert_called_once_with(b"CV?\r")
+        writer.close.assert_called_once()
+        assert manager.channel_volumes["FL"] == 0.0
+        assert manager.channel_volumes["FR"] == 3.5
+        assert manager.channel_volumes["C"] == -2.0

@@ -165,10 +165,15 @@ Python library. A single `DenonAVR` instance is created per config entry and
 shared by every platform:
 
 - The **media player** and **channel-volume** entities use the receiver
-  directly and receive push updates over Telnet.
-- A lightweight **coordinator** polls the Audyssey/Eco state (which is not sent
-  over Telnet) and serializes control commands, backing the `switch`, `select`
-  and `button` entities.
+  directly and receive push updates over Telnet. Everything goes through that
+  **single Telnet connection** — the integration never opens a second one
+  (receivers only reliably support one Telnet client).
+- A lightweight **coordinator** serializes control commands, backing the
+  `switch`, `select`, `button` and `sensor` entities. While Telnet is healthy
+  it makes no HTTP reads at all (Telnet keeps every setting current).
+- The receiver's port-11080 web API (real sound modes, signal/video status) is
+  read **gently**: only while the receiver is on, one request at a time, every
+  30 s, and it is left alone for 5 minutes if it stops answering.
 
 The *Recover audio* button performs a **soft** power cycle (standby off/on) and
 restores the previously selected input. It never cuts electrical power; do not

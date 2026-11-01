@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import timedelta
 from functools import wraps
@@ -38,7 +37,6 @@ from homeassistant.const import ATTR_COMMAND, CONF_HOST, CONF_MODEL, CONF_TYPE
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.httpx_client import get_async_client
 
 from .const import (
     CONF_MANUFACTURER,
@@ -49,13 +47,6 @@ from .const import (
 )
 from .heos_media_player import HeosStreamingPlayer
 from .util import sanitize_image_url
-from .webapi import (
-    SoundModeSettings,
-    async_get_sound_mode_settings,
-)
-from .webapi import (
-    async_select_sound_mode as webapi_select_sound_mode,
-)
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Coroutine
@@ -65,15 +56,12 @@ if TYPE_CHECKING:
     from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
     from . import DenonavrConfigEntry
+    from .webapi import SoundModeSettings
 
 _LOGGER = logging.getLogger(__name__)
 
 ATTR_SOUND_MODE_RAW = "sound_mode_raw"
 ATTR_DYNAMIC_EQ = "dynamic_eq"
-
-# Wait this long after setting a sound mode over the web API before reading it
-# back, so the receiver has applied the change (avoids an apparent revert).
-_WEB_SETTLE_SECONDS = 0.8
 
 SUPPORT_DENON = (
     MediaPlayerEntityFeature.VOLUME_STEP
@@ -296,12 +284,12 @@ class DenonDevice(MediaPlayerEntity):
         self._receiver = receiver
         self._update_audyssey = update_audyssey
 
-        # Real, device-reported sound modes via the port-11080 web API
-        # (main zone only). None until probed; False once known unsupported.
-        self._host = config_entry.data[CONF_HOST]
+        # Real, device-reported sound modes from the port-11080 web API (main
+        # zone only). They are read by the shared controls coordinator; the
+        # media player never queries the web API itself, so the receiver's
+        # fragile web server is polled from a single place.
         self._is_main_zone = receiver.zone == MAIN_ZONE
-        self._web_api_available: bool | None = None
-        self._web_sound_modes: SoundModeSettings | None = None
+        self._controls = config_entry.runtime_data.controls
 
         self._supported_features_base = SUPPORT_DENON
         self._supported_features_base |= (
@@ -337,35 +325,19 @@ class DenonDevice(MediaPlayerEntity):
             await self._receiver.async_telnet_disconnect()
         self._receiver.unregister_callback(ALL_TELNET_EVENTS, self._telnet_callback)
 
-    async def _async_update_web_sound_modes(self) -> None:
-        """
-        Refresh the real sound-mode list from the port-11080 web API.
-
-        Best-effort and main-zone only. Once the receiver is known not to
-        serve this API, it is never queried again.
-        """
-        if not self._is_main_zone or self._web_api_available is False:
-            return
-        settings = await async_get_sound_mode_settings(
-            get_async_client(self.hass), self._host
-        )
-        if settings is None:
-            if self._web_api_available is None:
-                self._web_api_available = False
-            return
-        self._web_api_available = True
-        self._web_sound_modes = settings
+    @property
+    def _web_sound_modes(self) -> SoundModeSettings | None:
+        """Return the device-reported sound modes, when the web API serves them."""
+        if not self._is_main_zone or not self._controls.web_available:
+            return None
+        return self._controls.sound_modes
 
     @async_log_errors
     async def async_update(self) -> None:
         """Get the latest status information from device."""
         receiver = self._receiver
 
-        # The real sound-mode list is only exposed over the web API, not
-        # Telnet, so refresh it on every poll regardless of Telnet health.
-        await self._async_update_web_sound_modes()
-
-        # We skip the rest of the update if telnet is healthy.
+        # We skip the update if telnet is healthy.
         # When telnet recovers it automatically updates all properties.
         if receiver.telnet_connected and receiver.telnet_healthy:
             return
@@ -412,17 +384,17 @@ class DenonDevice(MediaPlayerEntity):
         Prefer the real, device-reported list from the web API; fall back to
         the denonavr static list when the API is unavailable.
         """
-        if self._web_api_available and self._web_sound_modes is not None:
-            return self._web_sound_modes.names
+        if (settings := self._web_sound_modes) is not None:
+            return settings.names
         return self._fallback_sound_mode_list
 
     @property
     def sound_mode(self) -> str | None:
         """Return the current sound mode."""
-        if self._web_api_available and self._web_sound_modes is not None:
-            current = self._web_sound_modes.current
-            if current is not None:
-                return current
+        if (settings := self._web_sound_modes) is not None and (
+            current := settings.current
+        ) is not None:
+            return current
         return self._receiver.sound_mode
 
     @property
@@ -528,17 +500,13 @@ class DenonDevice(MediaPlayerEntity):
         names always match; otherwise use the denonavr Telnet/HTTP command.
         """
         settings = self._web_sound_modes
-        if self._web_api_available and settings is not None:
-            index = settings.index_for(sound_mode)
-            if index is not None and await webapi_select_sound_mode(
-                get_async_client(self.hass), self._host, index
-            ):
-                # The receiver takes a moment to apply the change; wait before
-                # reading it back so we don't re-read the previous mode.
-                await asyncio.sleep(_WEB_SETTLE_SECONDS)
-                await self._async_update_web_sound_modes()
-                self.async_write_ha_state()
-                return
+        index = settings.index_for(sound_mode) if settings is not None else None
+        if index is not None:
+            # The coordinator applies it, waits for the receiver to settle and
+            # re-reads the list, so the new mode is shown (no apparent revert).
+            await self._controls.async_set_sound_mode(index)
+            self.async_write_ha_state()
+            return
         await self._receiver.async_set_sound_mode(sound_mode)
 
     @async_log_errors

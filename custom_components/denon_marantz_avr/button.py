@@ -32,7 +32,7 @@ async def async_setup_entry(
                 ButtonEntityDescription(
                     key="refresh_audyssey", translation_key="refresh_audyssey"
                 ),
-                coordinator.async_request_refresh,
+                coordinator.async_refresh_audyssey,
             ),
             DenonButton(
                 coordinator,
