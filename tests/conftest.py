@@ -61,8 +61,18 @@ sys.modules["homeassistant.const"] = _ha_const_mod
 _denonavr_const = types.ModuleType("denonavr.const")
 _denonavr_const.POWER_ON = "ON"
 
+_denonavr_exceptions = types.ModuleType("denonavr.exceptions")
+
+
+class _DenonAvrError(Exception):
+    """Stand-in for denonavr.exceptions.DenonAvrError."""
+
+
+_denonavr_exceptions.DenonAvrError = _DenonAvrError
+
 sys.modules.setdefault("denonavr", types.ModuleType("denonavr"))
 sys.modules["denonavr.const"] = _denonavr_const
+sys.modules["denonavr.exceptions"] = _denonavr_exceptions
 
 # ---------------------------------------------------------------------------
 # Stub the custom_components.denon_marantz_avr *package* to bypass __init__.py,

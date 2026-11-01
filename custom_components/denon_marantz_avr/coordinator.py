@@ -13,9 +13,10 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import time
 from typing import TYPE_CHECKING
 
-from denonavr.const import ALL_TELNET_EVENTS
+from denonavr.const import ALL_TELNET_EVENTS, POWER_ON
 from denonavr.exceptions import DenonAvrError
 from homeassistant.core import callback
 from homeassistant.helpers.debounce import Debouncer
@@ -57,6 +58,10 @@ _TELNET_DEBOUNCE_SECONDS = 0.5
 # can return the old value and the entity appears to revert the change.
 _WEB_SETTLE_SECONDS = 0.8
 
+# The receiver's port-11080 web server is fragile. When it stops answering,
+# leave it alone for this long instead of retrying on every poll.
+_WEB_BACKOFF_SECONDS = 300.0
+
 
 class DenonControlsCoordinator(DataUpdateCoordinator[None]):
     """Coordinate receiver control updates and serialize commands."""
@@ -95,26 +100,68 @@ class DenonControlsCoordinator(DataUpdateCoordinator[None]):
         self.video_info: VideoInfo | None = None
         self.web_available = False
         self._web_probed = False
+        # Monotonic time before which the web API is left alone (back-off).
+        self._web_retry_at = 0.0
+
+    @property
+    def _telnet_ok(self) -> bool:
+        """Return True while the library's Telnet link keeps state current."""
+        return bool(self.receiver.telnet_connected and self.receiver.telnet_healthy)
+
+    def _clear_web_status(self) -> None:
+        """Forget the live status blocks (their sensors become unavailable)."""
+        self.audio_info = None
+        self.information = None
+        self.video_info = None
 
     async def _async_update_web(self) -> None:
-        """Refresh the web-API sound-mode and audio/video status (best-effort)."""
+        """
+        Refresh the web-API sound modes and audio/video status, gently.
+
+        The receiver's port-11080 web server is easy to overwhelm, so:
+
+        * it is only read while the receiver is on (after the first probe);
+        * requests go one at a time, never in parallel;
+        * the cheap sound-mode read goes first -- if it fails the server is in
+          trouble, so the other reads are skipped and the API is left alone
+          for a few minutes instead of being retried on every poll.
+        """
         if self._web_probed and not self.web_available:
             return
+        if self._web_probed and self.receiver.power != POWER_ON:
+            self._clear_web_status()
+            return
+        now = time.monotonic()
+        if now < self._web_retry_at:
+            return
+
         client = get_async_client(self.hass)
         host = self.receiver.host
         settings = await async_get_sound_mode_settings(client, host)
-        if settings is not None:
-            self.web_available = True
-            self.sound_modes = settings
-        elif not self._web_probed:
-            self.web_available = False
-        if self.web_available:
-            self.audio_info, self.information, self.video_info = await asyncio.gather(
-                async_get_audio_info(client, host),
-                async_get_information(client, host),
-                async_get_video_info(client, host),
+        if settings is None:
+            if not self._web_probed:
+                # First probe: this receiver does not serve the web API.
+                self._web_probed = True
+                self.web_available = False
+                return
+            self._web_retry_at = now + _WEB_BACKOFF_SECONDS
+            self._clear_web_status()
+            _LOGGER.debug(
+                "Web API on %s is not answering; pausing web reads for %.0f s",
+                host,
+                _WEB_BACKOFF_SECONDS,
             )
+            return
+
         self._web_probed = True
+        self.web_available = True
+        self.sound_modes = settings
+        if self.receiver.power != POWER_ON:
+            self._clear_web_status()
+            return
+        self.audio_info = await async_get_audio_info(client, host)
+        self.information = await async_get_information(client, host)
+        self.video_info = await async_get_video_info(client, host)
 
     async def async_set_sound_category(self, index: int) -> None:
         """Select a sound-mode category (genre) and refresh."""
@@ -131,8 +178,14 @@ class DenonControlsCoordinator(DataUpdateCoordinator[None]):
         await self.async_request_refresh()
 
     async def _async_push_telnet_update(self) -> None:
-        """Refresh the control entities with the latest Telnet-pushed state."""
-        self.async_set_updated_data(None)
+        """
+        Refresh the control entities with the latest Telnet-pushed state.
+
+        Only notify the listeners: ``async_set_updated_data`` would also
+        reschedule the next poll, and as the receiver pushes events every few
+        seconds the periodic refresh (and the web-API status) never ran.
+        """
+        self.async_update_listeners()
 
     @callback
     def async_register_telnet_listener(self) -> Callable[[], None]:
@@ -168,19 +221,30 @@ class DenonControlsCoordinator(DataUpdateCoordinator[None]):
         """
         Read current receiver and Audyssey settings.
 
-        The plain receiver update must succeed for the controls to be
-        available, but the Audyssey read is best-effort: some models or
-        sound modes do not expose it, and a failure there should not take
-        the whole integration down.
+        While the Telnet link is healthy it already keeps every setting
+        current (power, inputs, sound mode, Audyssey, Eco, ...), so the HTTP
+        reads are skipped -- the same rule the media player follows. Without
+        Telnet, the plain receiver update must succeed for the controls to be
+        available, but the Audyssey read is best-effort: some models or sound
+        modes do not expose it, and a failure there should not take the
+        whole integration down.
         """
-        try:
-            async with self.command_lock:
-                await self.receiver.async_update()
-                with contextlib.suppress(DenonAvrError):
-                    await self.receiver.async_update_audyssey()
-        except DenonAvrError as err:
-            raise UpdateFailed from err
+        if not self._telnet_ok:
+            try:
+                async with self.command_lock:
+                    await self.receiver.async_update()
+                    with contextlib.suppress(DenonAvrError):
+                        await self.receiver.async_update_audyssey()
+            except DenonAvrError as err:
+                raise UpdateFailed from err
         await self._async_update_web()
+
+    async def async_refresh_audyssey(self) -> None:
+        """Re-read the Audyssey settings on demand (the Refresh button)."""
+        async with self.command_lock:
+            with contextlib.suppress(DenonAvrError):
+                await self.receiver.async_update_audyssey()
+        self.async_update_listeners()
 
     async def async_run_command(self, command: Callable[[], Awaitable[None]]) -> None:
         """Run one command at a time and refresh Audyssey afterward."""
