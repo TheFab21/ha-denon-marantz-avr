@@ -506,3 +506,45 @@ class TestLayoutRequery:
         mock_receiver.power = "ON"
         manager._power_callback("Main", "ZM", "ON")
         manager.hass.loop.call_later.assert_called_once()
+
+
+class TestRequeryPrunesUnusedChannels:
+    """Channels not reported after a re-query become unavailable again."""
+
+    @staticmethod
+    def _answer(manager, *lines):
+        async def send(_command):
+            for line in lines:
+                manager._cv_callback("Main", "CV", line)
+
+        return send
+
+    async def test_back_to_stereo_drops_center_and_surrounds(
+        self, manager_with_entities, mock_receiver
+    ):
+        manager, entities = manager_with_entities
+        for channel in ("FL", "FR", "C", "SL", "SR"):
+            manager.channel_volumes[channel] = 0.0
+        mock_receiver.async_send_telnet_commands = AsyncMock(
+            side_effect=self._answer(manager, "FL 50", "FR 50")
+        )
+        with patch(
+            "custom_components.denon_marantz_avr.channel_volume.asyncio.sleep",
+            new=AsyncMock(),
+        ):
+            await manager._async_requery_levels()
+        assert manager.channel_volumes["FL"] == 0.0
+        assert manager.channel_volumes["FR"] == 0.0
+        for channel in ("C", "SL", "SR"):
+            assert manager.channel_volumes[channel] is None
+            entities[channel].async_write_ha_state.assert_called()
+
+    async def test_no_answer_keeps_levels(self, manager, mock_receiver):
+        manager.channel_volumes["C"] = 3.0
+        mock_receiver.async_send_telnet_commands = AsyncMock()
+        with patch(
+            "custom_components.denon_marantz_avr.channel_volume.asyncio.sleep",
+            new=AsyncMock(),
+        ):
+            await manager._async_requery_levels()
+        assert manager.channel_volumes["C"] == 3.0

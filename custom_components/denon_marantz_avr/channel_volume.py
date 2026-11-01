@@ -43,6 +43,10 @@ _RECEIVER_UPDATE_DEBOUNCE_S: float = 5.0
 # either changes (e.g. Stereo -> DTS Neural:X). Re-ask with a single CV? over
 # the existing Telnet link, this long after the last change.
 _REQUERY_DELAY_S: float = 2.0
+# Time allowed for the receiver to answer a CV? re-query with all its lines.
+# Channels it did not report by then are no longer in use (e.g. Center and
+# Surrounds after switching back to Stereo) and become unavailable.
+_REQUERY_SETTLE_S: float = 1.0
 
 # HTTP endpoint that accepts the same raw command strings as Telnet. Used as a
 # fallback when the library's Telnet connection is not available.
@@ -113,6 +117,8 @@ class ChannelVolumeManager:
         # delayed CV? re-query, see ``_layout_callback``.
         self._last_layout: dict[str, str] = {}
         self._requery_handle: asyncio.TimerHandle | None = None
+        # Channels reported since the last CV? re-query (None when idle).
+        self._query_reported: set[str] | None = None
 
     @property
     def is_receiver_powered_on(self) -> bool:
@@ -222,6 +228,10 @@ class ChannelVolumeManager:
                     channel_code,
                 )
                 return
+
+            # Remember it answered a pending re-query (even if skipped below).
+            if self._query_reported is not None:
+                self._query_reported.add(channel_code)
 
             # Check pending counter
             if self.pending_counters[channel_code] > 0:
@@ -345,8 +355,10 @@ class ChannelVolumeManager:
         if not self._telnet_ready or not self.is_receiver_powered_on:
             return
         zone_prefix = ZONE_PREFIXES.get(self.zone, "")
+        self._query_reported = set()
         try:
             await self.receiver.async_send_telnet_commands(f"{zone_prefix}CV?")
+            await asyncio.sleep(_REQUERY_SETTLE_S)
         except (DenonAvrError, TimeoutError, OSError) as err:
             _LOGGER.debug(
                 "CV re-query failed for %s zone %s: %s",
@@ -354,6 +366,22 @@ class ChannelVolumeManager:
                 self.zone,
                 err,
             )
+            return
+        finally:
+            reported, self._query_reported = self._query_reported, None
+        # The receiver only reports the channels the current sound mode uses.
+        # Drop the others so they show as unavailable instead of keeping a
+        # stale level -- but only if it actually answered.
+        if not reported:
+            return
+        for channel, level in self.channel_volumes.items():
+            if channel in reported or level is None:
+                continue
+            self.channel_volumes[channel] = None
+            self.pending_counters[channel] = 0
+            entity = self.entities.get(channel)
+            if entity is not None and hasattr(entity, "async_write_ha_state"):
+                entity.async_write_ha_state()
 
     async def _get_supported_channels(self) -> list[str]:
         """
