@@ -84,6 +84,9 @@
       "decoded_mode": {
         "default": "mdi:waveform"
       },
+      "video_input": {
+        "default": "mdi:import"
+      },
       "video_signal": {
         "default": "mdi:video-input-hdmi"
       },

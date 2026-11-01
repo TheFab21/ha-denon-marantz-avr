@@ -25,19 +25,24 @@ async def async_setup_entry(
     coordinator = entry.runtime_data.controls
     if not coordinator.web_available:
         return
-    entities: list[SensorEntity] = []
-    if coordinator.audio_info is not None:
-        entities.append(InputSignalSensor(coordinator))
-        entities.append(ActiveSpeakersSensor(coordinator))
-        entities.append(DiracSensor(coordinator))
-    if coordinator.information is not None:
-        entities.append(AudioFormatSensor(coordinator))
-        entities.append(DecodedModeSensor(coordinator))
-    if coordinator.video_info is not None:
-        entities.append(VideoSignalSensor(coordinator))
-        entities.append(HdrSensor(coordinator))
-        entities.append(AllmSensor(coordinator))
-        entities.append(QftSensor(coordinator))
+    # Create all web-API sensors whenever the receiver's port-11080 API is
+    # reachable. The individual audio/video blocks are only populated while a
+    # signal is playing, so gating creation on their presence at setup time
+    # would permanently drop sensors whenever Home Assistant happens to start
+    # with the receiver idle. Each sensor reports None (unknown) until its
+    # block appears and updates live from then on.
+    entities: list[SensorEntity] = [
+        InputSignalSensor(coordinator),
+        ActiveSpeakersSensor(coordinator),
+        DiracSensor(coordinator),
+        AudioFormatSensor(coordinator),
+        DecodedModeSensor(coordinator),
+        VideoInputSensor(coordinator),
+        VideoSignalSensor(coordinator),
+        HdrSensor(coordinator),
+        AllmSensor(coordinator),
+        QftSensor(coordinator),
+    ]
     async_add_entities(entities)
 
 
@@ -117,8 +122,30 @@ class DecodedModeSensor(DenonControlsEntity, SensorEntity):
         return info.sound if info is not None else None
 
 
+class VideoInputSensor(DenonControlsEntity, SensorEntity):
+    """The incoming HDMI video signal (input resolution, details in attributes)."""
+
+    _attr_translation_key = "video_input"
+
+    def __init__(self, coordinator: DenonControlsCoordinator) -> None:
+        """Initialize the video-input sensor."""
+        super().__init__(coordinator, "video_input")
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the incoming video resolution."""
+        video = self.coordinator.video_info
+        return video.resolution_in if video is not None else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str]:
+        """Return the incoming video fields (HDR, color space, depth, FRL)."""
+        video = self.coordinator.video_info
+        return video.input_attributes if video is not None else {}
+
+
 class VideoSignalSensor(DenonControlsEntity, SensorEntity):
-    """The HDMI video signal (output resolution, with details in attributes)."""
+    """The outgoing HDMI video signal (output resolution, details in attributes)."""
 
     _attr_translation_key = "video_signal"
 
@@ -134,9 +161,9 @@ class VideoSignalSensor(DenonControlsEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, str]:
-        """Return the detailed video fields (HDR, color space, depth...)."""
+        """Return the outgoing video fields (HDR, color space, depth, FRL)."""
         video = self.coordinator.video_info
-        return video.attributes if video is not None else {}
+        return video.output_attributes if video is not None else {}
 
 
 class HdrSensor(DenonControlsEntity, SensorEntity):

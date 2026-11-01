@@ -82,6 +82,7 @@ class TestParseVideo:
     def test_parses_in_out_fields(self) -> None:
         video = _parse_video(SAMPLE_VIDEO)
         assert video is not None
+        assert video.resolution_in == "4K50"
         assert video.resolution_out == "4K50"
         assert video.hdr_out == "HDR10"
         assert video.color_space_out == "YCbCr 4:2:0"
@@ -89,11 +90,31 @@ class TestParseVideo:
         assert video.pixel_depth_in == "10bits"
         assert video.pixel_depth_out == "8bits"
 
+    def test_input_and_output_attributes(self) -> None:
+        video = _parse_video(SAMPLE_VIDEO)
+        assert video is not None
+        assert video.input_attributes["resolution"] == "4K50"
+        assert video.input_attributes["pixel_depth"] == "10bits"
+        assert video.output_attributes["pixel_depth"] == "8bits"
+        # The "---" FRL placeholder is treated as no value in both views.
+        assert "frl" not in video.input_attributes
+        assert "frl" not in video.output_attributes
+
+    def test_parses_frl_rate(self) -> None:
+        video = _parse_video(
+            "<Video><FRLRate><Input>24G</Input><Output>18G</Output></FRLRate></Video>"
+        )
+        assert video is not None
+        assert video.frl_in == "24G"
+        assert video.frl_out == "18G"
+        assert video.input_attributes["frl"] == "24G"
+        assert video.output_attributes["frl"] == "18G"
+
     def test_placeholder_becomes_none(self) -> None:
         video = _parse_video(SAMPLE_VIDEO)
         assert video is not None
         # FRLRate "---" must be treated as no value, and omitted from attributes.
-        assert "frl_rate_out" not in video.attributes
+        assert "frl_out" not in video.attributes
         assert video.attributes["resolution_out"] == "4K50"
 
     def test_wrong_root_returns_none(self) -> None:
