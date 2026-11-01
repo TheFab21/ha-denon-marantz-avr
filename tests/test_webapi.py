@@ -4,6 +4,7 @@ from custom_components.denon_marantz_avr.webapi import (
     _parse_audio,
     _parse_information,
     _parse_video,
+    async_get_audio_info,
 )
 
 # Real sample from a Denon AVR-X4400H (Apple TV, 2.0 PCM upmixed to Neural:X).
@@ -159,9 +160,10 @@ class TestDiracAndGaming:
 
 
 # Real captures from a Marantz CINEMA (Apple TV, 2.0 PCM upmixed to DTS
-# Neural:X), taken from the receiver's own web UI on port 11080:
-#   /ajax/audio/get_config?type=1  -> <Audio>
+# Neural:X), taken from the receiver's own web UI on port 11080. The live
+# status blocks all come from the "info" section:
 #   /ajax/info/get_config?type=1   -> <Information>
+#   /ajax/info/get_config?type=2   -> <Audio>
 #   /ajax/info/get_config?type=3   -> <Video>
 # The audio block carries the extra Audyssey sub-block and an EXT (index 35)
 # input channel that the AVR-X4400H sample above does not, so it guards the
@@ -240,3 +242,44 @@ class TestMarantzCinemaCapture:
         assert video.qft is False
         # FRLRate "---" is treated as no value.
         assert "frl" not in video.output_attributes
+
+
+class _FakeResponse:
+    """A minimal stand-in for an httpx response."""
+
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+    def raise_for_status(self) -> None:
+        """No-op: the fake response is always a success."""
+
+
+class _RecordingClient:
+    """An httpx-like async client that records the request it is given."""
+
+    def __init__(self, body: str) -> None:
+        self._body = body
+        self.calls: list[tuple[str, dict]] = []
+
+    async def get(self, url: str, **kwargs: object) -> _FakeResponse:
+        """Record the request (url + params) and return the canned body."""
+        self.calls.append((url, kwargs.get("params") or {}))
+        return _FakeResponse(self._body)
+
+
+class TestAudioEndpoint:
+    """The live <Audio> status is served by /ajax/info/get_config?type=2.
+
+    Regression guard: it is NOT /ajax/audio/get_config?type=1, which returns
+    the audio *setup menu* (<listSetupMenu>) and left the input-signal /
+    active-speakers / Dirac sensors unknown.
+    """
+
+    async def test_audio_info_requests_info_type_2(self) -> None:
+        client = _RecordingClient(MARANTZ_AUDIO)
+        audio = await async_get_audio_info(client, "192.0.2.1")
+        url, params = client.calls[0]
+        assert url.endswith("/ajax/info/get_config")
+        assert params == {"type": 2}
+        assert audio is not None
+        assert audio.active_speakers == ["FL", "FR", "C", "SL", "SR"]
