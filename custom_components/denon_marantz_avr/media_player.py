@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import timedelta
 from functools import wraps
@@ -69,6 +70,10 @@ _LOGGER = logging.getLogger(__name__)
 
 ATTR_SOUND_MODE_RAW = "sound_mode_raw"
 ATTR_DYNAMIC_EQ = "dynamic_eq"
+
+# Wait this long after setting a sound mode over the web API before reading it
+# back, so the receiver has applied the change (avoids an apparent revert).
+_WEB_SETTLE_SECONDS = 0.8
 
 SUPPORT_DENON = (
     MediaPlayerEntityFeature.VOLUME_STEP
@@ -528,6 +533,9 @@ class DenonDevice(MediaPlayerEntity):
             if index is not None and await webapi_select_sound_mode(
                 get_async_client(self.hass), self._host, index
             ):
+                # The receiver takes a moment to apply the change; wait before
+                # reading it back so we don't re-read the previous mode.
+                await asyncio.sleep(_WEB_SETTLE_SECONDS)
                 await self._async_update_web_sound_modes()
                 self.async_write_ha_state()
                 return
