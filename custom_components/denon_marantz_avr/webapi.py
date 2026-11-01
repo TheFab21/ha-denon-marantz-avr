@@ -390,12 +390,14 @@ class VideoInfo:
     colorimetry_out: str | None
     pixel_depth_in: str | None
     pixel_depth_out: str | None
+    frl_in: str | None = None
+    frl_out: str | None = None
     allm: bool | None = None
     qft: bool | None = None
 
     @property
     def attributes(self) -> dict[str, str]:
-        """Return the populated video fields as a flat attribute mapping."""
+        """Return every populated video field as a flat attribute mapping."""
         fields = {
             "resolution_in": self.resolution_in,
             "resolution_out": self.resolution_out,
@@ -407,6 +409,34 @@ class VideoInfo:
             "colorimetry_out": self.colorimetry_out,
             "pixel_depth_in": self.pixel_depth_in,
             "pixel_depth_out": self.pixel_depth_out,
+            "frl_in": self.frl_in,
+            "frl_out": self.frl_out,
+        }
+        return {key: value for key, value in fields.items() if value is not None}
+
+    @property
+    def input_attributes(self) -> dict[str, str]:
+        """Return the populated *incoming* video fields (HDMI input side)."""
+        fields = {
+            "resolution": self.resolution_in,
+            "hdr": self.hdr_in,
+            "color_space": self.color_space_in,
+            "colorimetry": self.colorimetry_in,
+            "pixel_depth": self.pixel_depth_in,
+            "frl": self.frl_in,
+        }
+        return {key: value for key, value in fields.items() if value is not None}
+
+    @property
+    def output_attributes(self) -> dict[str, str]:
+        """Return the populated *outgoing* video fields (HDMI output side)."""
+        fields = {
+            "resolution": self.resolution_out,
+            "hdr": self.hdr_out,
+            "color_space": self.color_space_out,
+            "colorimetry": self.colorimetry_out,
+            "pixel_depth": self.pixel_depth_out,
+            "frl": self.frl_out,
         }
         return {key: value for key, value in fields.items() if value is not None}
 
@@ -432,6 +462,7 @@ def _parse_video(text: str) -> VideoInfo | None:
     color_space_in, color_space_out = _in_out(root, "ColorSpace")
     colorimetry_in, colorimetry_out = _in_out(root, "Colorimetry")
     pixel_depth_in, pixel_depth_out = _in_out(root, "PixelDepth")
+    frl_in, frl_out = _in_out(root, "FRLRate")
     allm_raw = _child_text(root, "ALLM")
     qft_raw = _child_text(root, "QFT")
     return VideoInfo(
@@ -445,6 +476,8 @@ def _parse_video(text: str) -> VideoInfo | None:
         colorimetry_out=colorimetry_out,
         pixel_depth_in=pixel_depth_in,
         pixel_depth_out=pixel_depth_out,
+        frl_in=frl_in,
+        frl_out=frl_out,
         allm=None if allm_raw is None else allm_raw == _FEATURE_ON,
         qft=None if qft_raw is None else qft_raw == _FEATURE_ON,
     )

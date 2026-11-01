@@ -141,8 +141,11 @@
             "decoded_mode": {
                 "name": "Mode de décodage"
             },
+            "video_input": {
+                "name": "Entrée vidéo"
+            },
             "video_signal": {
-                "name": "Signal vidéo"
+                "name": "Sortie vidéo"
             },
             "hdr": {
                 "name": "HDR"
