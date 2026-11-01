@@ -46,10 +46,32 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class InputSignalSensor(DenonControlsEntity, SensorEntity):
+class _WebStatusSensor(DenonControlsEntity, SensorEntity):
+    """
+    Base for a sensor backed by one of the port-11080 status blocks.
+
+    The receiver's web server returns an error for every block while it is
+    in standby or transitioning power, which blanks the backing block to
+    ``None``. Report the sensor as *unavailable* then, rather than showing a
+    misleading "unknown" state, and let it recover automatically once the
+    block is read again.
+    """
+
+    #: Name of the coordinator attribute holding this sensor's status block.
+    _web_block: str
+
+    @property
+    def available(self) -> bool:
+        """Return True only while this sensor's status block is present."""
+        block = getattr(self.coordinator, self._web_block)
+        return super().available and block is not None
+
+
+class InputSignalSensor(_WebStatusSensor):
     """The channels present in the incoming audio signal."""
 
     _attr_translation_key = "input_signal"
+    _web_block = "audio_info"
 
     def __init__(self, coordinator: DenonControlsCoordinator) -> None:
         """Initialize the input-signal sensor."""
@@ -68,10 +90,11 @@ class InputSignalSensor(DenonControlsEntity, SensorEntity):
         return {"channels": list(audio.input_signal) if audio is not None else []}
 
 
-class ActiveSpeakersSensor(DenonControlsEntity, SensorEntity):
+class ActiveSpeakersSensor(_WebStatusSensor):
     """The speakers the receiver is currently driving."""
 
     _attr_translation_key = "active_speakers"
+    _web_block = "audio_info"
 
     def __init__(self, coordinator: DenonControlsCoordinator) -> None:
         """Initialize the active-speakers sensor."""
@@ -90,10 +113,11 @@ class ActiveSpeakersSensor(DenonControlsEntity, SensorEntity):
         return {"speakers": list(audio.active_speakers) if audio is not None else []}
 
 
-class AudioFormatSensor(DenonControlsEntity, SensorEntity):
+class AudioFormatSensor(_WebStatusSensor):
     """The incoming audio format (e.g. PCM, Dolby TrueHD, DTS-HD MA)."""
 
     _attr_translation_key = "audio_format"
+    _web_block = "information"
 
     def __init__(self, coordinator: DenonControlsCoordinator) -> None:
         """Initialize the audio-format sensor."""
@@ -106,10 +130,11 @@ class AudioFormatSensor(DenonControlsEntity, SensorEntity):
         return info.signal if info is not None else None
 
 
-class DecodedModeSensor(DenonControlsEntity, SensorEntity):
+class DecodedModeSensor(_WebStatusSensor):
     """The active surround decoder / processing (e.g. DTS Neural:X)."""
 
     _attr_translation_key = "decoded_mode"
+    _web_block = "information"
 
     def __init__(self, coordinator: DenonControlsCoordinator) -> None:
         """Initialize the decoded-mode sensor."""
@@ -122,10 +147,11 @@ class DecodedModeSensor(DenonControlsEntity, SensorEntity):
         return info.sound if info is not None else None
 
 
-class VideoInputSensor(DenonControlsEntity, SensorEntity):
+class VideoInputSensor(_WebStatusSensor):
     """The incoming HDMI video signal (input resolution, details in attributes)."""
 
     _attr_translation_key = "video_input"
+    _web_block = "video_info"
 
     def __init__(self, coordinator: DenonControlsCoordinator) -> None:
         """Initialize the video-input sensor."""
@@ -144,10 +170,11 @@ class VideoInputSensor(DenonControlsEntity, SensorEntity):
         return video.input_attributes if video is not None else {}
 
 
-class VideoSignalSensor(DenonControlsEntity, SensorEntity):
+class VideoSignalSensor(_WebStatusSensor):
     """The outgoing HDMI video signal (output resolution, details in attributes)."""
 
     _attr_translation_key = "video_signal"
+    _web_block = "video_info"
 
     def __init__(self, coordinator: DenonControlsCoordinator) -> None:
         """Initialize the video-signal sensor."""
@@ -166,10 +193,11 @@ class VideoSignalSensor(DenonControlsEntity, SensorEntity):
         return video.output_attributes if video is not None else {}
 
 
-class HdrSensor(DenonControlsEntity, SensorEntity):
+class HdrSensor(_WebStatusSensor):
     """The HDMI output HDR format (e.g. HDR10, Dolby Vision, or none)."""
 
     _attr_translation_key = "hdr"
+    _web_block = "video_info"
 
     def __init__(self, coordinator: DenonControlsCoordinator) -> None:
         """Initialize the HDR sensor."""
@@ -189,10 +217,11 @@ def _on_off(*, value: bool | None) -> str | None:
     return "On" if value else "Off"
 
 
-class AllmSensor(DenonControlsEntity, SensorEntity):
+class AllmSensor(_WebStatusSensor):
     """Auto Low Latency Mode (HDMI 2.1 gaming) on the HDMI output."""
 
     _attr_translation_key = "allm"
+    _web_block = "video_info"
 
     def __init__(self, coordinator: DenonControlsCoordinator) -> None:
         """Initialize the ALLM sensor."""
@@ -205,10 +234,11 @@ class AllmSensor(DenonControlsEntity, SensorEntity):
         return _on_off(value=video.allm) if video is not None else None
 
 
-class QftSensor(DenonControlsEntity, SensorEntity):
+class QftSensor(_WebStatusSensor):
     """Quick Frame Transport (HDMI 2.1 gaming) on the HDMI output."""
 
     _attr_translation_key = "qft"
+    _web_block = "video_info"
 
     def __init__(self, coordinator: DenonControlsCoordinator) -> None:
         """Initialize the QFT sensor."""
@@ -221,10 +251,11 @@ class QftSensor(DenonControlsEntity, SensorEntity):
         return _on_off(value=video.qft) if video is not None else None
 
 
-class DiracSensor(DenonControlsEntity, SensorEntity):
+class DiracSensor(_WebStatusSensor):
     """Dirac Live room correction state (filter name when active, else Off)."""
 
     _attr_translation_key = "dirac_live"
+    _web_block = "audio_info"
 
     def __init__(self, coordinator: DenonControlsCoordinator) -> None:
         """Initialize the Dirac Live sensor."""
