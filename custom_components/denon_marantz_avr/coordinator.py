@@ -52,6 +52,11 @@ _LOGGER = logging.getLogger(__name__)
 # of refreshing once per event.
 _TELNET_DEBOUNCE_SECONDS = 0.5
 
+# After changing a web-API setting (sound category/mode), the receiver takes a
+# moment to apply it. Wait briefly before reading it back, otherwise the poll
+# can return the old value and the entity appears to revert the change.
+_WEB_SETTLE_SECONDS = 0.8
+
 
 class DenonControlsCoordinator(DataUpdateCoordinator[None]):
     """Coordinate receiver control updates and serialize commands."""
@@ -114,6 +119,7 @@ class DenonControlsCoordinator(DataUpdateCoordinator[None]):
     async def async_set_sound_category(self, index: int) -> None:
         """Select a sound-mode category (genre) and refresh."""
         await async_select_genre(get_async_client(self.hass), self.receiver.host, index)
+        await asyncio.sleep(_WEB_SETTLE_SECONDS)
         await self.async_request_refresh()
 
     async def async_set_sound_mode(self, index: int) -> None:
@@ -121,6 +127,7 @@ class DenonControlsCoordinator(DataUpdateCoordinator[None]):
         await async_select_sound_mode(
             get_async_client(self.hass), self.receiver.host, index
         )
+        await asyncio.sleep(_WEB_SETTLE_SECONDS)
         await self.async_request_refresh()
 
     async def _async_push_telnet_update(self) -> None:
