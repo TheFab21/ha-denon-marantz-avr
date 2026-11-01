@@ -156,3 +156,87 @@ class TestDiracAndGaming:
         assert video is not None
         assert video.allm is True
         assert video.qft is False
+
+
+# Real captures from a Marantz CINEMA (Apple TV, 2.0 PCM upmixed to DTS
+# Neural:X), taken from the receiver's own web UI on port 11080:
+#   /ajax/audio/get_config?type=1  -> <Audio>
+#   /ajax/info/get_config?type=1   -> <Information>
+#   /ajax/info/get_config?type=3   -> <Video>
+# The audio block carries the extra Audyssey sub-block and an EXT (index 35)
+# input channel that the AVR-X4400H sample above does not, so it guards the
+# parser against those real-world extras.
+MARANTZ_AUDIO = (
+    "<Audio><Volume>335</Volume><VolumeScale>1</VolumeScale>"
+    '<InputSignal mode="channel_icon"><List>'
+    '<Speaker index="0">2</Speaker><Speaker index="1">2</Speaker>'
+    '<Speaker index="2">1</Speaker><Speaker index="3">1</Speaker>'
+    '<Speaker index="5">1</Speaker><Speaker index="6">1</Speaker>'
+    '<Speaker index="7">1</Speaker><Speaker index="8">1</Speaker>'
+    '<Speaker index="9">1</Speaker><Speaker index="12">1</Speaker>'
+    '<Speaker index="13">1</Speaker><Speaker index="10">1</Speaker>'
+    '<Speaker index="11">1</Speaker><Speaker index="35">1</Speaker>'
+    '<Speaker index="30">0</Speaker><Speaker index="24">0</Speaker>'
+    '<Speaker index="25">0</Speaker><Speaker index="31">0</Speaker>'
+    "</List></InputSignal>"
+    "<ActiveSpeaker><List>"
+    '<Speaker index="0">2</Speaker><Speaker index="1">2</Speaker>'
+    '<Speaker index="2">2</Speaker><Speaker index="3">0</Speaker>'
+    '<Speaker index="5">2</Speaker><Speaker index="6">2</Speaker>'
+    '<Speaker index="7">0</Speaker><Speaker index="8">0</Speaker>'
+    "</List></ActiveSpeaker>"
+    "<BluetoothTransmitter>2</BluetoothTransmitter>"
+    '<Audyssey display="3"><MultEQ group="2">1</MultEQ>'
+    '<DynamicEQ display="3">1</DynamicEQ>'
+    '<DynamicVolume display="3">2</DynamicVolume></Audyssey>'
+    '<DiracLive display="1"/></Audio>'
+)
+
+MARANTZ_INFORMATION = (
+    "<Information><Source>Apple TV</Source><Signal>PCM</Signal>"
+    '<Video display="1"/><Sound>DTS Neural:X</Sound></Information>'
+)
+
+MARANTZ_VIDEO = (
+    "<Video><Resolution><Input>4K50</Input><Output>4K50</Output></Resolution>"
+    "<HDR><Input>HDR10</Input><Output>HDR10</Output></HDR>"
+    "<ColorSpace><Input>YCbCr 4:2:0</Input><Output>YCbCr 4:2:0</Output></ColorSpace>"
+    "<Colorimetry><Input>BT.2020</Input><Output>BT.2020</Output></Colorimetry>"
+    "<PixelDepth><Input>10bits</Input><Output>8bits</Output></PixelDepth>"
+    "<ALLM>2</ALLM><QFT>2</QFT>"
+    "<FRLRate><Input>---</Input><Output>---</Output></FRLRate></Video>"
+)
+
+
+class TestMarantzCinemaCapture:
+    """Regression tests against real Marantz CINEMA web-API responses."""
+
+    def test_audio_channels_and_dirac(self) -> None:
+        audio = _parse_audio(MARANTZ_AUDIO)
+        assert audio is not None
+        # The EXT (index 35) channel is only "available" (1), not active (2).
+        assert audio.input_signal == ["FL", "FR"]
+        assert audio.active_speakers == ["FL", "FR", "C", "SL", "SR"]
+        # Dirac is present but inactive (display="1").
+        assert audio.dirac_active is False
+        assert audio.dirac_state == "Off"
+
+    def test_information_fields(self) -> None:
+        info = _parse_information(MARANTZ_INFORMATION)
+        assert info is not None
+        assert info.source == "Apple TV"
+        assert info.signal == "PCM"
+        assert info.sound == "DTS Neural:X"
+
+    def test_video_input_output(self) -> None:
+        video = _parse_video(MARANTZ_VIDEO)
+        assert video is not None
+        # The receiver down-converts 10-bit input to 8-bit output.
+        assert video.input_attributes["pixel_depth"] == "10bits"
+        assert video.output_attributes["pixel_depth"] == "8bits"
+        assert video.resolution_in == "4K50"
+        assert video.resolution_out == "4K50"
+        assert video.allm is False
+        assert video.qft is False
+        # FRLRate "---" is treated as no value.
+        assert "frl" not in video.output_attributes
