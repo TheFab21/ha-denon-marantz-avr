@@ -71,6 +71,13 @@ ECO_MODE_OPTIONS = ["Off", "Auto", "On"]
 # Speaker preset slots (the receiver exposes presets 1 and 2)
 SPEAKER_PRESET_OPTIONS = ["1", "2"]
 
+# Smart Select (Marantz) / Quick Select (Denon) preset recall, via the direct
+# HTTP command endpoint. Marantz units expose 4 presets, Denon up to 5.
+SMART_SELECT_COMMAND = "/goform/formiPhoneAppDirect.xml?MSSMART{number}"
+QUICK_SELECT_COMMAND = "/goform/formiPhoneAppDirect.xml?MSQUICK{number}"
+MARANTZ_SMART_SELECT_COUNT = 4
+DENON_QUICK_SELECT_COUNT = 5
+
 # Sound-mode categories ("genre") on the web API. The receiver reports the
 # current category as a 1-based number; these are its labels in that order.
 SOUND_CATEGORY_OPTIONS = ["Movie", "Music", "Game", "Pure"]

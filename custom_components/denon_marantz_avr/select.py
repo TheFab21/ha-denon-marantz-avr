@@ -17,7 +17,11 @@ from homeassistant.components.select import SelectEntity, SelectEntityDescriptio
 from .const import (
     CONF_USE_TELNET,
     DEFAULT_USE_TELNET,
+    DENON_QUICK_SELECT_COUNT,
     ECO_MODE_OPTIONS,
+    MARANTZ_SMART_SELECT_COUNT,
+    QUICK_SELECT_COMMAND,
+    SMART_SELECT_COMMAND,
     SOUND_CATEGORY_OPTIONS,
     SPEAKER_PRESET_OPTIONS,
 )
@@ -188,6 +192,9 @@ async def async_setup_entry(
     )
     if (web_modes is not None and web_modes.names) or receiver.sound_mode_list:
         entities.append(SoundModeSelect(coordinator))
+
+    # Smart Select (Marantz) / Quick Select (Denon) preset recall.
+    entities.append(SmartSelectSelect(coordinator))
 
     async_add_entities(entities)
 
@@ -363,3 +370,33 @@ class SoundModeSelect(DenonControlsEntity, SelectEntity):
         await self.coordinator.async_send(
             lambda: self.coordinator.receiver.async_set_sound_mode(option)
         )
+
+
+class SmartSelectSelect(DenonControlsEntity, SelectEntity):
+    """
+    Recall a Smart Select (Marantz) / Quick Select (Denon) preset.
+
+    These presets restore a whole configuration (source, volume, sound mode,
+    ...) in one step. Selecting an option recalls that preset; the state
+    reflects the last preset recalled from Home Assistant.
+    """
+
+    def __init__(self, coordinator: DenonControlsCoordinator) -> None:
+        """Initialize the Smart/Quick Select entity for this brand."""
+        super().__init__(coordinator, "smart_select")
+        is_denon = "denon" in (coordinator.receiver.manufacturer or "").lower()
+        self._attr_translation_key = "quick_select" if is_denon else "smart_select"
+        count = DENON_QUICK_SELECT_COUNT if is_denon else MARANTZ_SMART_SELECT_COUNT
+        self._attr_options = [str(number) for number in range(1, count + 1)]
+        self._command = QUICK_SELECT_COMMAND if is_denon else SMART_SELECT_COMMAND
+
+    async def async_select_option(self, option: str) -> None:
+        """Recall the selected preset."""
+        command = self._command.format(number=option)
+
+        async def _recall() -> None:
+            await self.coordinator.receiver.async_get_command(command)
+
+        await self.coordinator.async_run_command(_recall)
+        self._attr_current_option = option
+        self.async_write_ha_state()
