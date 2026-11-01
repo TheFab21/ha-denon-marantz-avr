@@ -38,6 +38,12 @@ _LOGGER = logging.getLogger(__name__)
 # after the first successful HTTP update are no-ops.
 _RECEIVER_UPDATE_DEBOUNCE_S: float = 5.0
 
+# The receiver only reports levels (CV) for the channels the current sound mode
+# and speaker preset use, and does not push the newly active channels when
+# either changes (e.g. Stereo -> DTS Neural:X). Re-ask with a single CV? over
+# the existing Telnet link, this long after the last change.
+_REQUERY_DELAY_S: float = 2.0
+
 # HTTP endpoint that accepts the same raw command strings as Telnet. Used as a
 # fallback when the library's Telnet connection is not available.
 _APP_DIRECT_PATH = "/goform/formiPhoneAppDirect.xml?"
@@ -102,6 +108,11 @@ class ChannelVolumeManager:
         # subsequent callers within the same poll cycle skip redundantly.
         self._update_lock: asyncio.Lock = asyncio.Lock()
         self._last_receiver_update: float = 0.0
+
+        # Last seen sound mode (MS) / speaker preset (SP) and the pending
+        # delayed CV? re-query, see ``_layout_callback``.
+        self._last_layout: dict[str, str] = {}
+        self._requery_handle: asyncio.TimerHandle | None = None
 
     @property
     def is_receiver_powered_on(self) -> bool:
@@ -286,6 +297,8 @@ class ChannelVolumeManager:
                     current_power,
                 )
                 self._last_power_state = current_power
+                if current_power == POWER_ON:
+                    self._schedule_requery()
 
                 # Update all channel entities to reflect new availability
                 for entity in self.entities.values():
@@ -298,6 +311,48 @@ class ChannelVolumeManager:
                 zone,
                 event,
                 parameter,
+            )
+
+    def _layout_callback(self, zone: str, event: str, parameter: str) -> None:
+        """
+        Re-query the channel levels when the sound mode or speaker preset changes.
+
+        Only a real change triggers it (the receiver repeats some events), and
+        the sound mode only matters for the zone it belongs to.
+        """
+        if event == "MS" and zone not in (self.zone, "ALL_ZONES"):
+            return
+        value = parameter.strip()
+        if self._last_layout.get(event) == value:
+            return
+        self._last_layout[event] = value
+        self._schedule_requery()
+
+    def _schedule_requery(self) -> None:
+        """(Re)arm a single delayed CV? re-query, coalescing bursts."""
+        if self._requery_handle is not None:
+            self._requery_handle.cancel()
+        self._requery_handle = self.hass.loop.call_later(
+            _REQUERY_DELAY_S, self._fire_requery
+        )
+
+    def _fire_requery(self) -> None:
+        self._requery_handle = None
+        self.hass.async_create_task(self._async_requery_levels())
+
+    async def _async_requery_levels(self) -> None:
+        """Send CV? over the library's Telnet link; answers reach _cv_callback."""
+        if not self._telnet_ready or not self.is_receiver_powered_on:
+            return
+        zone_prefix = ZONE_PREFIXES.get(self.zone, "")
+        try:
+            await self.receiver.async_send_telnet_commands(f"{zone_prefix}CV?")
+        except (DenonAvrError, TimeoutError, OSError) as err:
+            _LOGGER.debug(
+                "CV re-query failed for %s zone %s: %s",
+                self.receiver.host,
+                self.zone,
+                err,
             )
 
     async def _get_supported_channels(self) -> list[str]:
@@ -492,6 +547,18 @@ class ChannelVolumeManager:
         except Exception:
             _LOGGER.exception(
                 "Failed to register power callback for %s zone %s",
+                self.receiver.host,
+                self.zone,
+            )
+
+        # Re-query the levels when the sound mode / speaker preset changes.
+        try:
+            if hasattr(self.receiver, "register_callback"):
+                self.receiver.register_callback("MS", self._layout_callback)
+                self.receiver.register_callback("SP", self._layout_callback)
+        except Exception:
+            _LOGGER.exception(
+                "Failed to register layout callbacks for %s zone %s",
                 self.receiver.host,
                 self.zone,
             )

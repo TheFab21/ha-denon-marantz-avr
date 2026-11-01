@@ -21,6 +21,13 @@ Home Assistant:
 > shadows or conflicts with a core Home Assistant integration and keeps working
 > across Home Assistant upgrades. You can even run it side by side with the
 > official integration while you migrate.
+>
+> **Once migrated, remove the official `denonavr` entry for that receiver.**
+> Running both doubles the connections to the receiver — including a second
+> Telnet client, which these receivers handle poorly — and its media player
+> still publishes broken artwork URLs (`…/aios_device/%22%22`). Likewise, this
+> integration already provides a HEOS streaming player, so the official `heos`
+> entry is only needed for other HEOS devices or grouping.
 
 If this project is useful to you, you can support its development:
 
