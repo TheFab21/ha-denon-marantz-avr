@@ -43,8 +43,13 @@ _LOGGER = logging.getLogger(__name__)
 WEBAPI_PORT = 11080
 _TIMEOUT = 4.0
 _GET_SOUND_MODE_TYPE = 9
-_GET_AUDIO_TYPE = 1
+# The live status blocks all live under the "info" section:
+#   /ajax/info/get_config?type=1 -> <Information> (source / signal / decoding)
+#   /ajax/info/get_config?type=2 -> <Audio>       (volume / input signal / speakers)
+#   /ajax/info/get_config?type=3 -> <Video>       (HDMI in/out status)
+# (The /ajax/audio/ section serves the audio *setup menu*, not the live status.)
 _GET_INFORMATION_TYPE = 1
+_GET_AUDIO_TYPE = 2
 _GET_VIDEO_TYPE = 3
 _SET_TYPE = 4
 
@@ -308,7 +313,7 @@ async def async_get_audio_info(
     """Fetch the active input-signal / speaker channels, or None if absent."""
     try:
         response = await client.get(
-            f"http://{host}:{WEBAPI_PORT}/ajax/audio/get_config",
+            f"http://{host}:{WEBAPI_PORT}/ajax/info/get_config",
             params={"type": _GET_AUDIO_TYPE},
             timeout=_TIMEOUT,
         )
