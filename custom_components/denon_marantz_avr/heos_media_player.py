@@ -62,6 +62,8 @@ from .util import sanitize_image_url
 if TYPE_CHECKING:
     from datetime import datetime
 
+    from homeassistant.core import HomeAssistant
+
     from .heos import HeosStreaming
 
 _LOGGER = logging.getLogger(__name__)
@@ -140,6 +142,10 @@ class HeosStreamingPlayer(MediaPlayerEntity):
     _attr_media_content_type = MediaType.MUSIC
     _attr_media_image_remotely_accessible = True
     _attr_supported_features = BASE_SUPPORTED_FEATURES
+    # The AVR media player now offers everything this one does while a network
+    # source is selected, so this separate entity is only kept for existing
+    # setups: it is disabled by default on new installs.
+    _attr_entity_registry_enabled_default = False
 
     def __init__(self, streaming: HeosStreaming, device_id: str) -> None:
         """Initialize the streaming player."""
@@ -158,14 +164,39 @@ class HeosStreamingPlayer(MediaPlayerEntity):
             self._streaming.heos.add_on_disconnected(self._on_disconnected)
         )
 
-    async def _on_player_event(self, event: str) -> None:
+    @property
+    def streaming(self) -> HeosStreaming:
+        """Return the HEOS connection this player uses."""
+        return self._streaming
+
+    def attach(self, hass: HomeAssistant, entity_id: str) -> None:
+        """
+        Use this player headless, on behalf of another entity.
+
+        The AVR media player embeds one to offer HEOS playback (browse, play
+        media, favorites, transport) without a second entity. It forwards the
+        player events through ``process_player_event``.
+        """
+        self.hass = hass
+        self.entity_id = entity_id
+        self._update_attributes()
+
+    def process_player_event(self, event: str) -> None:
+        """Update the cached HEOS state after a player event."""
         if event == heos_const.EVENT_PLAYER_NOW_PLAYING_PROGRESS:
             self._media_position_updated_at = utcnow()
         self._update_attributes()
+
+    def process_connection_change(self) -> None:
+        """Update the cached HEOS state after a (re)connection."""
+        self._update_attributes()
+
+    async def _on_player_event(self, event: str) -> None:
+        self.process_player_event(event)
         self.async_write_ha_state()
 
     async def _on_connected(self) -> None:
-        self._update_attributes()
+        self.process_connection_change()
         self.async_write_ha_state()
 
     async def _on_disconnected(self) -> None:

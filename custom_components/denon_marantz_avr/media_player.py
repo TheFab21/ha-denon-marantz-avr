@@ -34,6 +34,7 @@ from homeassistant.components.media_player import (
     MediaType,
 )
 from homeassistant.const import ATTR_COMMAND, CONF_HOST, CONF_MODEL, CONF_TYPE
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -50,8 +51,10 @@ from .util import sanitize_image_url
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Coroutine
+    from datetime import datetime
 
     from denonavr import DenonAVR
+    from homeassistant.components.media_player import BrowseMedia, RepeatMode
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -73,12 +76,19 @@ SUPPORT_DENON = (
 )
 
 SUPPORT_MEDIA_MODES = (
-    MediaPlayerEntityFeature.PLAY_MEDIA
-    | MediaPlayerEntityFeature.PAUSE
+    MediaPlayerEntityFeature.PAUSE
     | MediaPlayerEntityFeature.PREVIOUS_TRACK
     | MediaPlayerEntityFeature.NEXT_TRACK
     | MediaPlayerEntityFeature.VOLUME_SET
     | MediaPlayerEntityFeature.PLAY
+)
+
+# Offered whenever the receiver's HEOS player is reachable: playing media on it
+# switches the receiver to its network (HEOS) input by itself.
+SUPPORT_HEOS = (
+    MediaPlayerEntityFeature.PLAY_MEDIA
+    | MediaPlayerEntityFeature.BROWSE_MEDIA
+    | MediaPlayerEntityFeature.MEDIA_ENQUEUE
 )
 
 SCAN_INTERVAL = timedelta(seconds=10)
@@ -291,6 +301,15 @@ class DenonDevice(MediaPlayerEntity):
         self._is_main_zone = receiver.zone == MAIN_ZONE
         self._controls = config_entry.runtime_data.controls
 
+        # The receiver's own HEOS player (main zone only), used headless: while
+        # a network source is selected this entity shows the HEOS now-playing
+        # and offers its transport, repeat/shuffle, favorites, media browsing
+        # and play_media -- one complete media player instead of two.
+        heos = config_entry.runtime_data.heos
+        self._heos: HeosStreamingPlayer | None = None
+        if self._is_main_zone and heos is not None and heos.player is not None:
+            self._heos = HeosStreamingPlayer(heos, config_entry.unique_id)
+
         self._supported_features_base = SUPPORT_DENON
         self._supported_features_base |= (
             self._receiver.support_sound_mode
@@ -316,8 +335,51 @@ class DenonDevice(MediaPlayerEntity):
         self.async_write_ha_state()
 
     async def async_added_to_hass(self) -> None:
-        """Register for telnet events."""
+        """Register for telnet (and HEOS) events."""
         self._receiver.register_callback(ALL_TELNET_EVENTS, self._telnet_callback)
+        if (heos := self._heos) is not None:
+            heos.attach(self.hass, self.entity_id)
+            player = heos.streaming.player
+            if player is not None:
+                self.async_on_remove(
+                    player.add_on_player_event(self._async_on_heos_event)
+                )
+            self.async_on_remove(
+                heos.streaming.heos.add_on_connected(self._async_on_heos_connection)
+            )
+            self.async_on_remove(
+                heos.streaming.heos.add_on_disconnected(self._async_on_heos_connection)
+            )
+
+    async def _async_on_heos_event(self, event: str) -> None:
+        if self._heos is not None:
+            self._heos.process_player_event(event)
+        self.async_write_ha_state()
+
+    async def _async_on_heos_connection(self) -> None:
+        if self._heos is not None:
+            self._heos.process_connection_change()
+        self.async_write_ha_state()
+
+    @property
+    def _heos_ready(self) -> HeosStreamingPlayer | None:
+        """Return the HEOS player while it is connected."""
+        if self._heos is not None and self._heos.available:
+            return self._heos
+        return None
+
+    @property
+    def _heos_active(self) -> HeosStreamingPlayer | None:
+        """Return the HEOS player while it drives what the receiver plays."""
+        heos = self._heos_ready
+        receiver = self._receiver
+        if (
+            heos is not None
+            and receiver.power == POWER_ON
+            and receiver.input_func in receiver.netaudio_func_list
+        ):
+            return heos
+        return None
 
     async def async_will_remove_from_hass(self) -> None:
         """Clean up the entity."""
@@ -350,12 +412,21 @@ class DenonDevice(MediaPlayerEntity):
     @property
     def state(self) -> MediaPlayerState | None:
         """Return the state of the device."""
+        if (heos := self._heos_active) is not None:
+            return heos.state
         return DENON_STATE_MAPPING.get(self._receiver.state)
 
     @property
     def source_list(self) -> list[str]:
-        """Return a list of available input sources."""
-        return self._receiver.input_func_list
+        """Return the receiver inputs, followed by the HEOS favorites."""
+        sources = list(self._receiver.input_func_list or [])
+        if (heos := self._heos_ready) is not None:
+            sources.extend(
+                favorite.name
+                for favorite in heos.streaming.favorites.values()
+                if favorite.name not in sources
+            )
+        return sources
 
     @property
     def is_volume_muted(self) -> bool:
@@ -373,7 +444,11 @@ class DenonDevice(MediaPlayerEntity):
 
     @property
     def source(self) -> str | None:
-        """Return the current input source."""
+        """Return the current input source (or the HEOS favorite playing)."""
+        if (heos := self._heos_active) is not None:
+            name = heos.source
+            if name is not None and heos.streaming.favorite_index(name) is not None:
+                return name
         return self._receiver.input_func
 
     @property
@@ -400,20 +475,44 @@ class DenonDevice(MediaPlayerEntity):
     @property
     def supported_features(self) -> MediaPlayerEntityFeature:
         """Flag media player features that are supported."""
+        features = self._supported_features_base
+        if self._heos_ready is not None:
+            features |= SUPPORT_HEOS
+        if (heos := self._heos_active) is not None:
+            # Transport, stop, repeat/shuffle as the current HEOS media allows.
+            return features | heos.supported_features
         if self._receiver.input_func in self._receiver.netaudio_func_list:
-            return self._supported_features_base | SUPPORT_MEDIA_MODES
-        return self._supported_features_base
+            return features | SUPPORT_MEDIA_MODES
+        return features
 
     @property
     def media_content_type(self) -> MediaType:
         """Content type of current playing media."""
+        if self._heos_active is not None:
+            return MediaType.MUSIC
         if self._receiver.state in {MediaPlayerState.PLAYING, MediaPlayerState.PAUSED}:
             return MediaType.MUSIC
         return MediaType.CHANNEL
 
     @property
+    def media_content_id(self) -> str | None:
+        """Return the HEOS media id of what is playing."""
+        if (heos := self._heos_active) is not None:
+            return heos.media_content_id
+        return None
+
+    @property
+    def media_image_remotely_accessible(self) -> bool:
+        """HEOS cover art is served from the internet, the receiver's is local."""
+        return self._heos_active is not None
+
+    @property
     def media_image_url(self) -> str | None:
         """Image url of current playing media."""
+        if (heos := self._heos_active) is not None and (
+            url := heos.media_image_url
+        ) is not None:
+            return url
         if self._receiver.input_func in self._receiver.playing_func_list:
             return sanitize_image_url(self._receiver.image_url)
         return None
@@ -421,6 +520,10 @@ class DenonDevice(MediaPlayerEntity):
     @property
     def media_title(self) -> str | None:
         """Title of current playing media."""
+        if (heos := self._heos_active) is not None and (
+            title := heos.media_title
+        ) is not None:
+            return title
         if self._receiver.input_func not in self._receiver.playing_func_list:
             return self._receiver.input_func
         if self._receiver.title is not None:
@@ -430,6 +533,10 @@ class DenonDevice(MediaPlayerEntity):
     @property
     def media_artist(self) -> str | None:
         """Artist of current playing media, music track only."""
+        if (heos := self._heos_active) is not None and (
+            artist := heos.media_artist
+        ) is not None:
+            return artist
         if self._receiver.artist is not None:
             return self._receiver.artist
         return self._receiver.band
@@ -437,9 +544,43 @@ class DenonDevice(MediaPlayerEntity):
     @property
     def media_album_name(self) -> str | None:
         """Album name of current playing media, music track only."""
+        if (heos := self._heos_active) is not None and (
+            album := heos.media_album_name
+        ) is not None:
+            return album
         if self._receiver.album is not None:
             return self._receiver.album
         return self._receiver.station
+
+    @property
+    def media_duration(self) -> int | None:
+        """Duration of the HEOS track, in seconds."""
+        heos = self._heos_active
+        return heos.media_duration if heos is not None else None
+
+    @property
+    def media_position(self) -> int | None:
+        """Position in the HEOS track, in seconds."""
+        heos = self._heos_active
+        return heos.media_position if heos is not None else None
+
+    @property
+    def media_position_updated_at(self) -> datetime | None:
+        """When the HEOS track position was last valid."""
+        heos = self._heos_active
+        return heos.media_position_updated_at if heos is not None else None
+
+    @property
+    def repeat(self) -> RepeatMode | None:
+        """Repeat mode of the HEOS queue."""
+        heos = self._heos_active
+        return heos.repeat if heos is not None else None
+
+    @property
+    def shuffle(self) -> bool | None:
+        """Shuffle state of the HEOS queue."""
+        heos = self._heos_active
+        return heos.shuffle if heos is not None else None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -464,32 +605,93 @@ class DenonDevice(MediaPlayerEntity):
     @async_log_errors
     async def async_media_play_pause(self) -> None:
         """Play or pause the media player."""
+        if (heos := self._heos_active) is not None:
+            if heos.state == MediaPlayerState.PLAYING:
+                await heos.async_media_pause()
+            else:
+                await heos.async_media_play()
+            return
         await self._receiver.async_toggle_play_pause()
 
     @async_log_errors
     async def async_media_play(self) -> None:
         """Send play command."""
+        if (heos := self._heos_active) is not None:
+            await heos.async_media_play()
+            return
         await self._receiver.async_play()
 
     @async_log_errors
     async def async_media_pause(self) -> None:
         """Send pause command."""
+        if (heos := self._heos_active) is not None:
+            await heos.async_media_pause()
+            return
         await self._receiver.async_pause()
+
+    async def async_media_stop(self) -> None:
+        """Send stop command (HEOS only)."""
+        if (heos := self._heos_active) is not None:
+            await heos.async_media_stop()
 
     @async_log_errors
     async def async_media_previous_track(self) -> None:
         """Send previous track command."""
+        if (heos := self._heos_active) is not None:
+            await heos.async_media_previous_track()
+            return
         await self._receiver.async_previous_track()
 
     @async_log_errors
     async def async_media_next_track(self) -> None:
         """Send next track command."""
+        if (heos := self._heos_active) is not None:
+            await heos.async_media_next_track()
+            return
         await self._receiver.async_next_track()
+
+    async def async_set_repeat(self, repeat: RepeatMode) -> None:
+        """Set the HEOS repeat mode."""
+        if (heos := self._heos_active) is not None:
+            await heos.async_set_repeat(repeat)
+
+    async def async_set_shuffle(self, shuffle: bool) -> None:  # noqa: FBT001
+        """Enable or disable HEOS shuffle."""
+        if (heos := self._heos_active) is not None:
+            await heos.async_set_shuffle(shuffle)
 
     @async_log_errors
     async def async_select_source(self, source: str) -> None:
-        """Select input source."""
+        """Select a receiver input, or play a HEOS favorite."""
+        heos = self._heos_ready
+        if (
+            heos is not None
+            and source not in (self._receiver.input_func_list or [])
+            and heos.streaming.favorite_index(source) is not None
+        ):
+            await heos.async_select_source(source)
+            return
         await self._receiver.async_set_input_func(source)
+
+    async def async_play_media(
+        self, media_type: MediaType | str, media_id: str, **kwargs: Any
+    ) -> None:
+        """Play media through the receiver's HEOS player."""
+        if (heos := self._heos_ready) is None:
+            msg = "Playing media needs the receiver's HEOS player"
+            raise HomeAssistantError(msg)
+        await heos.async_play_media(media_type, media_id, **kwargs)
+
+    async def async_browse_media(
+        self,
+        media_content_type: MediaType | str | None = None,
+        media_content_id: str | None = None,
+    ) -> BrowseMedia:
+        """Browse HEOS music sources, favorites and media-source items."""
+        if (heos := self._heos_ready) is None:
+            msg = "Browsing media needs the receiver's HEOS player"
+            raise HomeAssistantError(msg)
+        return await heos.async_browse_media(media_content_type, media_content_id)
 
     @async_log_errors
     async def async_select_sound_mode(self, sound_mode: str) -> None:
